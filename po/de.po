@@ -474,3 +474,24 @@ msgstr "Seitenverhältnis wahren (kleineres Bild)"
 
 msgid "The PiP window paints no background, so keeping the proportions does not give black bars - the television shows through and it simply looks like a smaller window. Filling matches the PiP size exactly, at the cost of a slight stretch."
 msgstr "Das PiP-Fenster zeichnet keinen Hintergrund. Das Seitenverhältnis zu wahren ergibt deshalb keine schwarzen Balken - das Fernsehbild scheint durch und es wirkt einfach wie ein kleineres Fenster. Ausfüllen trifft die PiP-Größe exakt, um den Preis einer leichten Verzerrung."
+
+msgid "UniFi Protect: PiP key"
+msgstr "UniFi Protect: PiP-Taste"
+
+msgid "UniFi Protect: PiP key (long)"
+msgstr "UniFi Protect: PiP-Taste (lang)"
+
+msgid "Picture in Picture, or switch everything off"
+msgstr "Bild-in-Bild, oder alles ausschalten"
+
+msgid "Camera corner on, or step to the next camera"
+msgstr "Kamera-Ecke einschalten, oder zur nächsten Kamera"
+
+msgid "Use the PiP key for the camera"
+msgstr "PiP-Taste für die Kamera nutzen"
+
+msgid "Long press shows the camera corner, and again steps to the next camera. Short press keeps the box's own Picture in Picture, and switches everything off when something is showing."
+msgstr "Langer Druck zeigt die Kamera-Ecke, ein weiterer wechselt zur nächsten Kamera. Kurzer Druck behält das normale Bild-in-Bild der Box und schaltet alles aus, wenn etwas angezeigt wird."
+
+msgid "Picture in Picture is not available here."
+msgstr "Bild-in-Bild ist hier nicht verfügbar."

@@ -155,6 +155,11 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 
 		entries.extend([
 			_divider(_("Other")),
+			(_("Use the PiP key for the camera"), cfg.pip_key,
+				_("Long press shows the camera corner, and again steps to "
+					"the next camera. Short press keeps the box's own "
+					"Picture in Picture, and switches everything off when "
+					"something is showing.")),
 			(_("Start the corner automatically"), cfg.autostart,
 				_("Show the corner as soon as the receiver has started.")),
 			(_("Write debug messages to the log"), cfg.debug,

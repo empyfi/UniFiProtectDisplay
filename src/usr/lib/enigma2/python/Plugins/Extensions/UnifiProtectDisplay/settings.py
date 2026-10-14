@@ -109,6 +109,9 @@ def init_config():
 	settings.rotate_interval = ConfigSelectionNumber(5, 300, 5, default=15)
 
 	# -- behaviour --------------------------------------------------------
+	# Takes over the remote's PiP key: short press keeps the box's own
+	# behaviour, long press drives the camera corner.
+	settings.pip_key = ConfigYesNo(default=False)
 	settings.autostart = ConfigYesNo(default=False)
 	settings.debug = ConfigYesNo(default=False)
 	# Fixed port 0 means "ask the OS for a free one", which avoids colliding

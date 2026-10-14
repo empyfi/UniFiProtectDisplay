@@ -67,6 +67,8 @@ SETTINGS = {
 	"player": (PLAIN, "auto"),
 	"corner_mode": (PLAIN, "off"),
 	"follow_pip": (BOOLEAN, True),
+	"corner_fit": (PLAIN, "fill"),
+	"pip_key": (BOOLEAN, False),
 	"corner": (PLAIN, "topright"),
 	"corner_width": (PLAIN, "25"),
 	"corner_margin": (PLAIN, "2"),
@@ -382,6 +384,14 @@ def build_parser():
 		"--plain-rtsp", dest="plain_rtsp", action="store_true", default=None,
 		help="use unencrypted RTSP on port 7447")
 	display.add_argument(
+		"--fit", dest="corner_fit", choices=("fill", "letterbox"),
+		help="fill the PiP window, or keep the camera's proportions")
+	display.add_argument(
+		"--pip-key", dest="pip_key", action="store_true", default=None,
+		help="long press on the PiP key drives the camera corner")
+	display.add_argument(
+		"--no-pip-key", dest="pip_key", action="store_false")
+	display.add_argument(
 		"--autostart", dest="autostart", action="store_true", default=None)
 	display.add_argument(
 		"--no-autostart", dest="autostart", action="store_false")
@@ -413,6 +423,7 @@ def collect_overrides(args, api_key):
 		("player", "player"), ("interval", "snapshot_interval"),
 		("rotate", "rotate"), ("rotate_interval", "rotate_interval"),
 		("plain_rtsp", "plain_rtsp"), ("autostart", "autostart"),
+		("corner_fit", "corner_fit"), ("pip_key", "pip_key"),
 		("debug", "debug"),
 	)
 	for attribute, setting in mapping:

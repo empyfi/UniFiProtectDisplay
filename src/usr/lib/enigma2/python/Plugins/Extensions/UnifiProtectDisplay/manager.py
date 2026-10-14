@@ -84,6 +84,7 @@ class DisplayManager(object):
 		self.controller.invalidate_stream()
 		self.rotation.enabled = config.rotate.value
 		self.rotation.set_cameras(self.store.enabled_ids())
+		self.apply_key_binding()
 
 		# Restart only what was already on screen. Saving settings is not a
 		# request to switch the corner on, and a corner appearing by itself
@@ -203,6 +204,148 @@ class DisplayManager(object):
 		return True, ""
 
 	# -- misc -------------------------------------------------------------
+
+	# -- the PiP key ------------------------------------------------------
+
+	def pip_key_long(self):
+		"""Long press: bring the corner up, or step to the next camera."""
+		if self.corner_running():
+			self.next_camera()
+			return True, ""
+		self._close_foreign_pip()
+		return self.start_corner()
+
+	def pip_key_short(self):
+		"""Short press: normal PiP, or switch everything off.
+
+		Anything showing -- our corner or the box's own PiP -- is cleared;
+		otherwise this is the box's ordinary PiP button.
+		"""
+		if self.corner_running():
+			self.stop_corner()
+			return True, ""
+		if self._foreign_pip_shown():
+			self._close_foreign_pip()
+			return True, ""
+		infobar = self._infobar()
+		if infobar is None:
+			return False, _("Picture in Picture is not available here.")
+		infobar.showPiP()
+		return True, ""
+
+	def _infobar(self):
+		try:
+			from Screens.InfoBar import InfoBar
+			return InfoBar.instance
+		except (ImportError, AttributeError):
+			return None
+
+	def _foreign_pip_shown(self):
+		"""True when a PiP is up that is not ours."""
+		return (not self.corner_running()
+			and getattr(self.session, "pipshown", False))
+
+	def _close_foreign_pip(self):
+		"""Hand the decoder back by closing the box's own PiP.
+
+		Our corner borrows session.pip and refuses to start while something
+		else holds it, so the long press would otherwise do nothing at all
+		when the user already has PiP open.
+		"""
+		if not self._foreign_pip_shown():
+			return
+		infobar = self._infobar()
+		if infobar is not None:
+			try:
+				infobar.showPiP()  # toggles it off
+				return
+			except Exception as exc:  # noqa: BLE001
+				self.log.error("could not close the existing PiP: %s", exc)
+		# Last resort, mirroring what InfoBar does itself.
+		if hasattr(self.session, "pip"):
+			del self.session.pip
+		self.session.pipshown = False
+
+	def apply_key_binding(self):
+		"""Put our two actions on the box's PiP key, or take them off again.
+
+		Driven by the ``pip_key`` setting. The index ButtonSetup uses for a
+		plugin depends on what else is registered, so it is recomputed here
+		rather than stored.
+		"""
+		from . import buttonbinding
+		config = settings_module.get_config()
+		try:
+			from Components.config import config as e2config
+			from Screens.ButtonSetup import BUTTON_SETUP_KEYS
+			from Plugins.Plugin import PluginDescriptor
+			from Components.PluginComponent import plugins
+		except ImportError as exc:
+			self.log.error("cannot reach the button setup (%s)", exc)
+			return False
+
+		holder = getattr(e2config.misc, "ButtonSetup", None)
+		if holder is None:
+			self.log.error("this image has no button setup to bind to")
+			return False
+
+		assignments = {}
+		for _label, name, _default in BUTTON_SETUP_KEYS:
+			element = getattr(holder, name, None)
+			if element is not None:
+				assignments[name] = element.value
+
+		pip_key = buttonbinding.find_pip_key(assignments)
+		short_name = buttonbinding.short_key(pip_key)
+		long_name = buttonbinding.long_key(pip_key)
+		if not pip_key:
+			self.log.error("found no PiP key to bind to")
+			return False
+
+		if not config.pip_key.value:
+			# Only clear entries that are ours, never the user's own.
+			cleared = 0
+			for name in (short_name, long_name):
+				element = getattr(holder, name, None)
+				if element is not None and buttonbinding.PLUGIN_PATH in element.value:
+					element.value = ""
+					element.save()
+					cleared += 1
+			if cleared:
+				settings_module.save()
+				self.log.info("released %s/%s", short_name, long_name)
+			return True
+
+		entries = []
+		for plugin in sorted(
+				plugins.getPlugins([
+					PluginDescriptor.WHERE_PLUGINMENU,
+					PluginDescriptor.WHERE_EXTENSIONSMENU,
+					PluginDescriptor.WHERE_EVENTINFO,
+					PluginDescriptor.WHERE_BUTTONSETUP]),
+				key=lambda item: item.name):
+			path = plugin.path or ""
+			index = path.rfind("Plugins")
+			entries.append((plugin.name, path[index:] if index >= 0 else ""))
+
+		from .plugin import KEY_LONG_NAME, KEY_SHORT_NAME
+		wanted = buttonbinding.desired_assignments(
+			entries, pip_key, KEY_SHORT_NAME, KEY_LONG_NAME)
+		if not wanted:
+			self.log.error("could not work out the button setup entries")
+			return False
+
+		for name, action in wanted.items():
+			element = getattr(holder, name, None)
+			if element is None:
+				self.log.error("this image has no %s key", name)
+				return False
+			element.value = action
+			element.save()
+		settings_module.save()
+		self.log.info("PiP key bound: %s -> %s, %s -> %s",
+			short_name, wanted.get(short_name), long_name, wanted.get(long_name))
+		return True
 
 	def next_camera(self):
 		if self._overlay is not None:
