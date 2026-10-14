@@ -19,11 +19,16 @@ class Rotation(object):
 	other camera's position.
 	"""
 
-	def __init__(self, camera_ids=None, enabled=True):
+	def __init__(self, camera_ids=None, enabled=True, is_usable=None):
 		self._ids = list(camera_ids or [])
 		self.enabled = enabled
 		self._index = 0
 		self._paused = False
+		# Optional predicate deciding whether a camera is worth switching
+		# to. A camera the console reports as offline shows nothing but
+		# black, so stepping onto it reads as "the button did not work" --
+		# which is how this started life as a bug report.
+		self._is_usable = is_usable
 
 	# -- selection --------------------------------------------------------
 
@@ -65,7 +70,7 @@ class Rotation(object):
 		if not self._ids:
 			return None
 		if self.should_rotate():
-			self._index = (self._index + 1) % len(self._ids)
+			self._step(1)
 		return self.current()
 
 	def next(self):
@@ -76,14 +81,43 @@ class Rotation(object):
 		"""
 		if not self._ids:
 			return None
-		self._index = (self._index + 1) % len(self._ids)
+		self._step(1)
 		return self.current()
 
 	def previous(self):
 		if not self._ids:
 			return None
-		self._index = (self._index - 1) % len(self._ids)
+		self._step(-1)
 		return self.current()
+
+	def _step(self, direction):
+		"""Move one usable camera along, wrapping around.
+
+		Unusable cameras are stepped over. If none are usable the cursor
+		still moves by one, so the behaviour degrades to plain cycling
+		rather than freezing -- a stale offline flag must not make the
+		button stop working altogether.
+		"""
+		count = len(self._ids)
+		self._index = (self._index + direction) % count
+		if self._is_usable is None:
+			return
+		# Remember where one plain step landed. If the search comes back
+		# empty it returns here, so the cursor has still moved by one --
+		# otherwise a stale offline flag on every camera would leave the
+		# button doing nothing at all, which is worse than showing black.
+		first = self._index
+		for _ in range(count):
+			if self._is_usable(self._ids[self._index]):
+				return
+			self._index = (self._index + direction) % count
+		self._index = first
+
+	def usable_ids(self):
+		"""The cameras currently considered worth switching to."""
+		if self._is_usable is None:
+			return list(self._ids)
+		return [cid for cid in self._ids if self._is_usable(cid)]
 
 	def select(self, camera_id):
 		"""Jump to ``camera_id``. Returns False when it is not in the list."""

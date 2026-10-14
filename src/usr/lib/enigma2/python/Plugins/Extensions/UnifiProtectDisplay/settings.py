@@ -105,6 +105,9 @@ def init_config():
 	settings.snapshot_high_quality = ConfigYesNo(default=False)
 
 	# -- rotation ---------------------------------------------------------
+	# An offline camera decodes to nothing, so stepping onto it looks like
+	# the button did not work.
+	settings.skip_offline = ConfigYesNo(default=True)
 	settings.rotate = ConfigYesNo(default=False)
 	settings.rotate_interval = ConfigSelectionNumber(5, 300, 5, default=15)
 

@@ -41,7 +41,8 @@ class DisplayManager(object):
 		self.runner = TaskRunner(timer_factory=eTimer, log=self.log)
 		self.store = CameraStore(log=self.log).load()
 		self.rotation = Rotation(
-			self.store.enabled_ids(), enabled=config.rotate.value)
+			self.store.enabled_ids(), enabled=config.rotate.value,
+			is_usable=self._camera_usable)
 		self.api = self._build_api(config)
 		self.controller = Controller(
 			self.api, self.runner, self.store,
@@ -60,6 +61,16 @@ class DisplayManager(object):
 		return cls.instance
 
 	# -- configuration ----------------------------------------------------
+
+	def _camera_usable(self, camera_id):
+		"""Skip cameras the console last reported as offline.
+
+		They decode to nothing, so stepping onto one is indistinguishable
+		from the button not having worked.
+		"""
+		if not settings_module.get_config().skip_offline.value:
+			return True
+		return self.store.is_connected(camera_id)
 
 	def _build_api(self, config):
 		return ProtectApi(

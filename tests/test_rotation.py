@@ -105,3 +105,56 @@ class TestIndexSafety:
 		rot.select("c")
 		rot._ids = ["a"]  # simulate an external shrink
 		assert rot.current() == "a"
+
+
+class TestSkippingUnusableCameras:
+	"""An offline camera decodes to nothing, so landing on it is
+	indistinguishable from the button not having worked."""
+
+	@staticmethod
+	def rot(ids, offline=()):
+		return Rotation(ids, is_usable=lambda cid: cid not in offline)
+
+	def test_next_steps_over_an_offline_camera(self):
+		r = self.rot(["a", "b", "c"], offline={"b"})
+		assert r.next() == "c"
+
+	def test_two_cameras_one_offline_stays_on_the_working_one(self):
+		# Exactly the reported case: every second press went black.
+		r = self.rot(["a", "b"], offline={"b"})
+		assert r.next() == "a"
+		assert r.next() == "a"
+
+	def test_previous_also_skips(self):
+		r = self.rot(["a", "b", "c"], offline={"b"})
+		r.select("c")
+		assert r.previous() == "a"
+
+	def test_several_offline_in_a_row_are_all_skipped(self):
+		r = self.rot(["a", "b", "c", "d"], offline={"b", "c"})
+		assert r.next() == "d"
+
+	def test_all_offline_still_moves(self):
+		# A stale offline flag must not make the button stop working.
+		r = self.rot(["a", "b"], offline={"a", "b"})
+		assert r.next() == "b"
+		assert r.next() == "a"
+
+	def test_automatic_rotation_skips_too(self):
+		r = Rotation(["a", "b", "c"], enabled=True,
+			is_usable=lambda cid: cid != "b")
+		assert r.advance() == "c"
+
+	def test_without_a_predicate_nothing_is_skipped(self):
+		r = Rotation(["a", "b", "c"])
+		assert r.next() == "b"
+
+	def test_usable_ids_reports_the_filtered_list(self):
+		r = self.rot(["a", "b", "c"], offline={"b"})
+		assert r.usable_ids() == ["a", "c"]
+
+	def test_select_still_reaches_an_offline_camera(self):
+		# Skipping is for stepping; an explicit choice is the user's.
+		r = self.rot(["a", "b"], offline={"b"})
+		assert r.select("b") is True
+		assert r.current() == "b"

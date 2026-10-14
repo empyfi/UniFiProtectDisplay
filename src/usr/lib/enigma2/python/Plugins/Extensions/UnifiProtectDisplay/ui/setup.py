@@ -146,6 +146,10 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 					"this only if playback fails with a TLS error; the plain "
 					"port does not exist on every Protect version.")),
 			_divider(_("Rotation")),
+			(_("Skip offline cameras"), cfg.skip_offline,
+				_("A camera the console reports as offline shows nothing. "
+					"Stepping over it keeps the next-camera button feeling "
+					"like it did something.")),
 			(_("Rotate through cameras"), cfg.rotate,
 				_("Cycle through the selected cameras automatically.")),
 		])

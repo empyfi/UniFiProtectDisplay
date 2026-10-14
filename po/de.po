@@ -495,3 +495,9 @@ msgstr "Langer Druck zeigt die Kamera-Ecke, ein weiterer wechselt zur nächsten 
 
 msgid "Picture in Picture is not available here."
 msgstr "Bild-in-Bild ist hier nicht verfügbar."
+
+msgid "Skip offline cameras"
+msgstr "Offline-Kameras überspringen"
+
+msgid "A camera the console reports as offline shows nothing. Stepping over it keeps the next-camera button feeling like it did something."
+msgstr "Eine Kamera, die die Konsole als offline meldet, zeigt nichts. Sie zu überspringen sorgt dafür, dass die Weiterschalt-Taste spürbar etwas tut."

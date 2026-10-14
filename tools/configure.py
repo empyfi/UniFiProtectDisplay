@@ -69,6 +69,7 @@ SETTINGS = {
 	"follow_pip": (BOOLEAN, True),
 	"corner_fit": (PLAIN, "fill"),
 	"pip_key": (BOOLEAN, False),
+	"skip_offline": (BOOLEAN, True),
 	"corner": (PLAIN, "topright"),
 	"corner_width": (PLAIN, "25"),
 	"corner_margin": (PLAIN, "2"),
@@ -376,6 +377,11 @@ def build_parser():
 	display.add_argument(
 		"--interval", type=int, help="seconds between snapshots")
 	display.add_argument(
+		"--skip-offline", dest="skip_offline", action="store_true",
+		default=None, help="step over cameras the console reports offline")
+	display.add_argument(
+		"--no-skip-offline", dest="skip_offline", action="store_false")
+	display.add_argument(
 		"--rotate", dest="rotate", action="store_true", default=None)
 	display.add_argument("--no-rotate", dest="rotate", action="store_false")
 	display.add_argument(
@@ -422,6 +428,7 @@ def collect_overrides(args, api_key):
 		("margin", "corner_margin"), ("quality", "quality"),
 		("player", "player"), ("interval", "snapshot_interval"),
 		("rotate", "rotate"), ("rotate_interval", "rotate_interval"),
+		("skip_offline", "skip_offline"),
 		("plain_rtsp", "plain_rtsp"), ("autostart", "autostart"),
 		("corner_fit", "corner_fit"), ("pip_key", "pip_key"),
 		("debug", "debug"),
