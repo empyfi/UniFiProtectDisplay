@@ -19,20 +19,20 @@ msgstr ""
 msgid "ffmpeg is not installed (opkg install ffmpeg)"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:111
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:115
 msgid "The corner display is switched off in setup."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:115
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:188
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:119
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:193
 msgid "No cameras are selected. Open the camera list first."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:121
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:125
 msgid "Unknown display mode: %s"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:140
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:144
 msgid "Could not start the overlay: %s"
 msgstr ""
 
@@ -53,7 +53,7 @@ msgid "UniFi Protect: fullscreen"
 msgstr ""
 
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/plugin.py:139
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:103
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:113
 msgid "Show a camera full screen"
 msgstr ""
 
@@ -121,6 +121,14 @@ msgstr ""
 msgid "Live video (PiP, needs ffmpeg)"
 msgstr ""
 
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/settings.py:96
+msgid "Fill the window (same size as PiP)"
+msgstr ""
+
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/settings.py:97
+msgid "Keep proportions (smaller picture)"
+msgstr ""
+
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/player/fullscreen.py:126
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/render/snapshot_overlay.py:148
 msgid "No camera selected"
@@ -138,30 +146,30 @@ msgstr ""
 msgid "Rotation paused"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/player/pip_remux.py:97
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/player/pip_remux.py:99
 msgid "Live video in a corner is not possible: %s"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/player/pip_remux.py:102
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/player/pip_remux.py:104
 msgid "Picture in Picture is already in use. Close it first."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/player/pip_remux.py:109
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/player/pip_remux.py:111
 msgid "Could not start the local stream proxy: %s"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/player/pip_remux.py:117
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/player/pip_remux.py:119
 msgid "Could not open the PiP window: %s"
 msgstr ""
 
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/cameras.py:46
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:69
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:70
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:63
 msgid "Cameras"
 msgstr ""
 
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/cameras.py:54
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:67
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:68
 msgid "Close"
 msgstr ""
 
@@ -201,83 +209,95 @@ msgstr ""
 msgid "Camera list is up to date."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:61
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:62
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:49
 msgid "UniFi Protect Display"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:68
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:69
 msgid "Settings"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:70
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:71
 msgid "Corner on/off"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:95
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:96
 msgid "Corner is switched off in settings"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:98
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:119
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:99
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:129
 msgid "Hide corner"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:98
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:119
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:99
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:129
 msgid "Show corner"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:99
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:100
 msgid "live video"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:100
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:101
 msgid "snapshots"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:106
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:110
+msgid "Move and resize the window"
+msgstr ""
+
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:116
 msgid "Next camera"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:109
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:119
 msgid "Cameras..."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:112
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:122
 msgid "Settings..."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:127
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:137
 msgid "Not set up yet: no console address or API key."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:130
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:140
 msgid "Console %s, %d camera(s) selected."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:138
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:148
 msgid "Live video cannot run here: %s"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:140
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:150
 msgid "Corner: live video, %s"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:143
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:153
 msgid "Corner: snapshots every %s s, %s"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:146
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:156
 msgid "Corner: off"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:154
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:164
 msgid "same window as Picture in Picture"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:155
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:165
 msgid "%s, %s%% wide"
+msgstr ""
+
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:214
+msgid "Switch the corner on first, then the window can be moved and resized."
+msgstr ""
+
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/mainmenu.py:223
+msgid "This image has no Picture in Picture editor (%s)."
 msgstr ""
 
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:60
@@ -336,146 +356,154 @@ msgstr ""
 msgid "Use the window you already set up for Picture in Picture, at that position and size. The camera is letterboxed inside it if the shapes differ. Adjust that window with the box's own PiP settings."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:110
-msgid "Position"
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:108
+msgid "Picture inside the window"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:111
-msgid "Which corner of the screen the camera appears in."
-msgstr ""
-
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:112
-msgid "Width"
-msgstr ""
-
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:113
-msgid "Width as a percentage of the screen. The height follows at 16:9."
-msgstr ""
-
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:115
-msgid "Margin"
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:109
+msgid "The PiP window paints no background, so keeping the proportions does not give black bars - the television shows through and it simply looks like a smaller window. Filling matches the PiP size exactly, at the cost of a slight stretch."
 msgstr ""
 
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:116
-msgid "Distance from the screen edge, as a percentage."
+msgid "Position"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:120
-msgid "Refresh every"
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:117
+msgid "Which corner of the screen the camera appears in."
+msgstr ""
+
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:118
+msgid "Width"
+msgstr ""
+
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:119
+msgid "Width as a percentage of the screen. The height follows at 16:9."
 msgstr ""
 
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:121
+msgid "Margin"
+msgstr ""
+
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:122
+msgid "Distance from the screen edge, as a percentage."
+msgstr ""
+
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:126
+msgid "Refresh every"
+msgstr ""
+
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:127
 msgid "Seconds between snapshots. Lower is smoother but asks more of the console."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:123
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:129
 msgid "Request high quality snapshots"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:124
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:130
 msgid "Off is usually right: the picture is scaled into a corner anyway, and a larger image costs console and decoding time."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:130
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:136
 msgid "Cameras and playback"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:131
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:137
 msgid "Stream quality"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:132
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:138
 msgid "Which Protect stream tier to use. Low or medium is H.264 on most cameras and is the safer choice on older boxes."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:135
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:141
 msgid "Player"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:136
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:142
 msgid "Automatic picks exteplayer3 when serviceapp is installed, otherwise GStreamer."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:138
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:144
 msgid "Use unencrypted RTSP"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:139
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:145
 msgid "Rewrites the stream URL to port 7447 without TLS. Try this only if playback fails with a TLS error; the plain port does not exist on every Protect version."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:142
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:148
 msgid "Rotation"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:143
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:149
 msgid "Rotate through cameras"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:144
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:150
 msgid "Cycle through the selected cameras automatically."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:147
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:153
 msgid "Change camera every"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:148
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:154
 msgid "Seconds each camera stays on screen."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:151
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:157
 msgid "Other"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:152
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:158
 msgid "Start the corner automatically"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:153
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:159
 msgid "Show the corner as soon as the receiver has started."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:154
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:160
 msgid "Write debug messages to the log"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:155
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:161
 msgid "Turn on only while troubleshooting."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:167
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:173
 msgid "Snapshots work on every box. Live video is unavailable here: %s."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:170
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:176
 msgid "Snapshots are still pictures, roughly one per second, and work everywhere. Live video uses the PiP decoder and ffmpeg."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:201
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:207
 msgid "Live video will not start on this box: %s"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:205
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:211
 msgid "Enter the console address and an API key to begin."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:209
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:215
 msgid "%d camera(s) selected. Press Blue to change."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:217
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:223
 msgid "Enter the console address and an API key first."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:219
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:225
 msgid "Contacting the console..."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:232
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:238
 msgid "Connected. Protect version %s"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:233
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:239
 msgid "Connected."
 msgstr ""

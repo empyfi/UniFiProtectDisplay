@@ -89,6 +89,13 @@ def init_config():
 	# Picture, rather than making them position a second small window for
 	# the same decoder.
 	settings.follow_pip = ConfigYesNo(default=True)
+	# Fill by default: the PiP window paints no background, so letterboxing
+	# shows the television through the unused area instead of black bars,
+	# which reads as a smaller window rather than as bars.
+	settings.corner_fit = ConfigSelection(default="fill", choices=[
+		("fill", _("Fill the window (same size as PiP)")),
+		("letterbox", _("Keep proportions (smaller picture)")),
+	])
 	settings.corner = ConfigSelection(
 		default=CORNER_TOP_RIGHT, choices=CORNER_CHOICES)
 	settings.corner_width = ConfigSelectionNumber(

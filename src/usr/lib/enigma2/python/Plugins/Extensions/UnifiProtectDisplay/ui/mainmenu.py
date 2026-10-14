@@ -31,6 +31,7 @@ ACTION_FULLSCREEN = "fullscreen"
 ACTION_NEXT = "next"
 ACTION_CAMERAS = "cameras"
 ACTION_SETUP = "setup"
+ACTION_WINDOW = "window"
 
 
 class UnifiProtectMain(Screen):
@@ -99,6 +100,15 @@ class UnifiProtectMain(Screen):
 			rows.append("%s  (%s)" % (label, _("live video")
 				if mode == MODE_PIP else _("snapshots")))
 			self._actions.append(ACTION_TOGGLE)
+
+		# Only while the live-video corner is up: enigma2's PiPSetup edits a
+		# running PiP window and has nothing to work on otherwise. Offered
+		# here because openATV has no menu entry for PiP geometry at all --
+		# its only route is an extensions entry that does not appear on
+		# every box.
+		if running and mode == MODE_PIP:
+			rows.append(_("Move and resize the window"))
+			self._actions.append(ACTION_WINDOW)
 
 		rows.append(_("Show a camera full screen"))
 		self._actions.append(ACTION_FULLSCREEN)
@@ -172,6 +182,8 @@ class UnifiProtectMain(Screen):
 			self._rebuild()
 		elif action == ACTION_CAMERAS:
 			self._open_cameras()
+		elif action == ACTION_WINDOW:
+			self._edit_window()
 		elif action == ACTION_SETUP:
 			self._open_setup()
 
@@ -186,6 +198,40 @@ class UnifiProtectMain(Screen):
 			# until it closes. Say so rather than leaving the user pressing
 			# the button again.
 			self.close()
+
+	def _edit_window(self):
+		"""Hand the running PiP window to enigma2's own geometry editor.
+
+		Arrow keys move it, Bouquet +/- resize it, OK saves into
+		config.av.pip -- which is also what the box's own Picture-in-Picture
+		uses, so one edit arranges both.
+		"""
+		corner = self._manager.pip_corner()
+		pip = getattr(self.session, "pip", None)
+		if corner is None or pip is None:
+			self.session.open(
+				MessageBox,
+				_("Switch the corner on first, then the window can be "
+					"moved and resized."),
+				type=MessageBox.TYPE_INFO, timeout=8)
+			return
+		try:
+			from Screens.PiPSetup import PiPSetup
+		except ImportError as exc:
+			self.session.open(
+				MessageBox,
+				_("This image has no Picture in Picture editor (%s).") % exc,
+				type=MessageBox.TYPE_INFO, timeout=8)
+			return
+		self.session.openWithCallback(self._window_edited, PiPSetup, pip=pip)
+
+	def _window_edited(self, *args):
+		# PiPSetup sizes the video to fill, so whichever fit the user chose
+		# has to be put back afterwards.
+		corner = self._manager.pip_corner()
+		if corner is not None:
+			corner.reapply_geometry()
+		self._rebuild()
 
 	def _open_fullscreen(self):
 		ok, message = self._manager.open_fullscreen()

@@ -130,6 +130,28 @@ def corner_label(corner):
 PIP_DEFAULT_RECT = (510, 28, 180, 135)
 
 
+FIT_FILL = "fill"
+FIT_LETTERBOX = "letterbox"
+
+
+def fit_rect(outer_width, outer_height, aspect=DEFAULT_ASPECT, mode=FIT_FILL):
+	"""Place the video inside the window according to ``mode``.
+
+	``fill`` uses the whole window, so the camera is exactly as large as the
+	box's own Picture-in-Picture; a camera whose shape differs is stretched
+	a little. ``letterbox`` keeps the proportions and leaves the rest of the
+	window unused.
+
+	Worth knowing before choosing: the PiP window has no painted
+	background of its own, so the unused area is not black bars -- the
+	television behind simply shows through, and the result reads as a
+	smaller window rather than as letterboxing.
+	"""
+	if mode == FIT_LETTERBOX:
+		return letterbox(outer_width, outer_height, aspect)
+	return 0, 0, max(1, int(outer_width)), max(1, int(outer_height))
+
+
 def letterbox(outer_width, outer_height, aspect=DEFAULT_ASPECT):
 	"""Centre an ``aspect``-correct rectangle inside a given one.
 

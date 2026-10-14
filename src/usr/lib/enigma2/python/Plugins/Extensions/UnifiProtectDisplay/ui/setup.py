@@ -105,6 +105,12 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 					"Picture, at that position and size. The camera is "
 					"letterboxed inside it if the shapes differ. Adjust that "
 					"window with the box's own PiP settings.")))
+			entries.append((_("Picture inside the window"), cfg.corner_fit,
+				_("The PiP window paints no background, so keeping the "
+					"proportions does not give black bars - the television "
+					"shows through and it simply looks like a smaller "
+					"window. Filling matches the PiP size exactly, at the "
+					"cost of a slight stretch.")))
 			if not cfg.follow_pip.value:
 				entries.extend([
 					(_("Position"), cfg.corner,

@@ -99,6 +99,10 @@ class DisplayManager(object):
 
 	# -- the corner -------------------------------------------------------
 
+	def pip_corner(self):
+		"""The running live-video corner, or None."""
+		return self._pip if (self._pip is not None and self._pip.active) else None
+
 	def corner_running(self):
 		return self._overlay is not None or (
 			self._pip is not None and self._pip.active)
@@ -150,6 +154,7 @@ class DisplayManager(object):
 			rotate_interval=config.rotate_interval.value,
 			proxy_port=config.proxy_port.value,
 			follow_pip=config.follow_pip.value,
+			fit=config.corner_fit.value,
 			log=self.log)
 		ok, message = self._pip.start()
 		if not ok:

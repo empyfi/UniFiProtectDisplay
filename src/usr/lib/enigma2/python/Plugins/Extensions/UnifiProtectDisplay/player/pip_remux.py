@@ -54,7 +54,8 @@ class PipCorner(object):
 	def __init__(self, session, controller, rotation, capabilities,
 			corner="topright", width_percent=25, margin_percent=2,
 			rotate_interval=15, proxy_port=0, log=None, proxy=None,
-			follow_pip=True, aspect=geometry.DEFAULT_ASPECT):
+			follow_pip=True, aspect=geometry.DEFAULT_ASPECT,
+			fit=geometry.FIT_FILL):
 		self.session = session
 		self._controller = controller
 		self._rotation = rotation
@@ -65,6 +66,7 @@ class PipCorner(object):
 		self._rotate_interval = max(1, int(rotate_interval))
 		self._follow_pip = follow_pip
 		self._aspect = aspect
+		self._fit = fit
 		self._log = log
 		self._proxy = proxy or TsProxy(
 			ffmpeg_path=(capabilities.which("ffmpeg") or "ffmpeg")
@@ -259,6 +261,11 @@ class PipCorner(object):
 
 	# -- the user's PiP geometry ------------------------------------------
 
+	def reapply_geometry(self):
+		"""Re-assert the geometry, e.g. after the user edited the window."""
+		if self._active and hasattr(self.session, "pip"):
+			self._apply_geometry()
+
 	def _apply_geometry(self):
 		"""Size the window exactly like the box's own Picture-in-Picture.
 
@@ -288,8 +295,8 @@ class PipCorner(object):
 			pip.instance.resize(eSize(width, height))
 			# The video widget is positioned inside the window, so the bars
 			# are simply the part of the window it does not cover.
-			vx, vy, vwidth, vheight = geometry.letterbox(
-				width, height, self._aspect)
+			vx, vy, vwidth, vheight = geometry.fit_rect(
+				width, height, self._aspect, self._fit)
 			video = pip["video"].instance
 			video.move(ePoint(vx, vy))
 			video.resize(eSize(vwidth, vheight))

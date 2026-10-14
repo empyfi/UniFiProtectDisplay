@@ -453,3 +453,24 @@ msgstr "Verwendet das Fenster, das du bereits für Bild-in-Bild eingerichtet has
 
 msgid "same window as Picture in Picture"
 msgstr "gleiches Fenster wie Bild-in-Bild"
+
+msgid "Move and resize the window"
+msgstr "Fenster verschieben und Größe ändern"
+
+msgid "Switch the corner on first, then the window can be moved and resized."
+msgstr "Schalte zuerst die Ecke ein, dann lässt sich das Fenster verschieben und in der Größe ändern."
+
+msgid "This image has no Picture in Picture editor (%s)."
+msgstr "Dieses Image hat keinen Bild-in-Bild-Editor (%s)."
+
+msgid "Picture inside the window"
+msgstr "Bild im Fenster"
+
+msgid "Fill the window (same size as PiP)"
+msgstr "Fenster ausfüllen (gleiche Größe wie PiP)"
+
+msgid "Keep proportions (smaller picture)"
+msgstr "Seitenverhältnis wahren (kleineres Bild)"
+
+msgid "The PiP window paints no background, so keeping the proportions does not give black bars - the television shows through and it simply looks like a smaller window. Filling matches the PiP size exactly, at the cost of a slight stretch."
+msgstr "Das PiP-Fenster zeichnet keinen Hintergrund. Das Seitenverhältnis zu wahren ergibt deshalb keine schwarzen Balken - das Fernsehbild scheint durch und es wirkt einfach wie ein kleineres Fenster. Ausfüllen trifft die PiP-Größe exakt, um den Preis einer leichten Verzerrung."
