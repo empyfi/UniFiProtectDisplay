@@ -174,3 +174,79 @@ class TestBinding:
 		# Unlike the TS proxy, this one has to be reachable from the
 		# console, which is a different machine.
 		assert webhook.BIND_HOST == "0.0.0.0"
+
+
+class TestLearnMode:
+	"""A catch-all route used to find out what Protect actually sends.
+
+	It accepts any trailing path, so one URL can go into every alarm while
+	the distinguishing feature is still unknown.
+	"""
+
+	def test_accepts_the_bare_learn_path(self):
+		assert webhook.parse_learn_path("/%s/learn" % TOKEN, TOKEN) is True
+
+	def test_accepts_anything_after_the_segment(self):
+		assert webhook.parse_learn_path(
+			"/%s/learn/whatever/deep" % TOKEN, TOKEN) is True
+
+	def test_accepts_a_query_string(self):
+		assert webhook.parse_learn_path(
+			"/%s/learn?x=1" % TOKEN, TOKEN) is True
+
+	def test_rejects_a_wrong_token(self):
+		assert webhook.parse_learn_path("/nope/learn", TOKEN) is False
+
+	def test_rejects_another_segment(self):
+		assert webhook.parse_learn_path("/%s/other" % TOKEN, TOKEN) is False
+
+	@pytest.mark.parametrize("path", ["", "/", None, "/%s" % TOKEN])
+	def test_rejects_junk(self, path):
+		assert webhook.parse_learn_path(path, TOKEN) is False
+
+	def test_learn_url_is_parsed_by_its_own_rule(self):
+		url = webhook.learn_url("10.0.0.2", 8099, TOKEN)
+		path = "/" + url.split("/", 3)[3]
+		assert webhook.parse_learn_path(path, TOKEN) is True
+
+	def test_a_learn_call_is_captured_not_treated_as_motion(self):
+		motions, learned = [], []
+		server = WebhookServer(
+			token=TOKEN, on_motion=motions.append, on_learn=learned.append)
+		server._capture = lambda *a, **k: learned.append(a)
+		assert server.handle("/%s/learn" % TOKEN, "POST", b'{"a":1}') == 204
+		assert motions == []
+		assert learned
+
+	def test_capture_records_method_path_and_body(self, tmp_path):
+		captured = []
+		server = WebhookServer(token=TOKEN, on_learn=captured.append)
+		webhook.CAPTURE_PATH = str(tmp_path / "cap.json")
+		server.handle("/%s/learn" % TOKEN, "POST", b'{"alarm":"motion"}',
+			{"Content-Type": "application/json"})
+		assert len(captured) == 1
+		entry = captured[0]
+		assert entry["method"] == "POST"
+		assert entry["body"] == '{"alarm":"motion"}'
+		assert entry["headers"]["Content-Type"] == "application/json"
+
+	def test_captures_are_written_as_json_lines(self, tmp_path):
+		path = tmp_path / "cap.json"
+		webhook.CAPTURE_PATH = str(path)
+		server = WebhookServer(token=TOKEN)
+		server.handle("/%s/learn" % TOKEN, "POST", b'{"n":1}')
+		server.handle("/%s/learn" % TOKEN, "POST", b'{"n":2}')
+		import json as _json
+		lines = [l for l in path.read_text().splitlines() if l.strip()]
+		assert len(lines) == 2
+		assert _json.loads(lines[1])["body"] == '{"n":2}'
+
+	def test_old_captures_are_trimmed(self, tmp_path):
+		path = tmp_path / "cap.json"
+		webhook.CAPTURE_PATH = str(path)
+		webhook.CAPTURE_LIMIT = 3
+		server = WebhookServer(token=TOKEN)
+		for i in range(6):
+			server.handle("/%s/learn" % TOKEN, "POST", b'{"n":%d}' % i)
+		lines = [l for l in path.read_text().splitlines() if l.strip()]
+		assert len(lines) == 3

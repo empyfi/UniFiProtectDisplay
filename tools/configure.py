@@ -427,6 +427,16 @@ def build_parser():
 		"--motion-hold", dest="motion_hold", type=int,
 		help="seconds a camera stays on screen after motion")
 	motion.add_argument(
+		"--learn-url", action="store_true",
+		help="print one URL to paste into every alarm while finding out "
+			"what Protect sends")
+	motion.add_argument(
+		"--learn-show", action="store_true",
+		help="print the webhook calls captured so far, verbatim")
+	motion.add_argument(
+		"--learn-clear", action="store_true",
+		help="discard captured webhook calls")
+	motion.add_argument(
 		"--webhook-urls", action="store_true",
 		help="print the URLs to paste into Protect, then exit")
 
@@ -512,6 +522,74 @@ def show_webhook_urls(client, box_host):
 	log("URLs already pasted into Protect.")
 
 
+CAPTURE_PATH = "/tmp/unifiprotectdisplay_webhooks.json"
+
+
+def _webhook_basics(client):
+	values = current_settings(client)
+	if values.get("webhook", "False") != "True":
+		return None, None
+	return values.get("webhook_token") or None, values.get("webhook_port") or "8099"
+
+
+def show_learn_url(client, box_host):
+	token, port = _webhook_basics(client)
+	if not token:
+		log("Motion reporting is off, or no token yet. Switch it on and let")
+		log("Enigma2 restart once:")
+		log("    python tools/configure.py %s --webhook" % box_host)
+		return
+	log("Paste this one URL into EVERY alarm in Protect, method POST:")
+	log("")
+	log("    http://%s:%s/%s/learn" % (box_host, port, token))
+	log("")
+	log("Then trigger each camera once - Test Alarm in the dialog does it -")
+	log("and read what arrived with:")
+	log("    python tools/configure.py %s --learn-show" % box_host)
+
+
+def show_captures(client):
+	raw = read_remote(client, CAPTURE_PATH)
+	entries = []
+	for line in raw.splitlines():
+		line = line.strip()
+		if not line:
+			continue
+		try:
+			entries.append(json.loads(line))
+		except ValueError:
+			continue
+	if not entries:
+		log("Nothing captured yet.")
+		log("Paste the learn URL into an alarm and press Test Alarm:")
+		log("    python tools/configure.py <box> --learn-url")
+		return
+	log("%d call(s) captured:" % len(entries))
+	for index, entry in enumerate(entries, 1):
+		log("")
+		log("--- %d  %s  %s %s" % (
+			index, entry.get("at"), entry.get("method"), entry.get("path")))
+		headers = entry.get("headers") or {}
+		for name in sorted(headers):
+			if name.lower() in ("content-type", "user-agent", "content-length"):
+				log("    %s: %s" % (name, headers[name]))
+		body = entry.get("body") or ""
+		if not body:
+			log("    (no body - a GET webhook carries nothing)")
+			continue
+		try:
+			parsed = json.loads(body)
+			log("    body (JSON):")
+			log(json.dumps(parsed, indent=6, ensure_ascii=False)[:2500])
+		except ValueError:
+			log("    body: %s" % body[:800])
+
+
+def clear_captures(client):
+	run(client, "rm -f %s" % CAPTURE_PATH, check=False)
+	log("Captured calls discarded.")
+
+
 def show(client):
 	values = current_settings(client)
 	log("configuration on the box:")
@@ -552,6 +630,15 @@ def main(argv=None):
 
 	client = connect(args)
 	try:
+		if args.learn_url:
+			show_learn_url(client, args.host)
+			return 0
+		if args.learn_show:
+			show_captures(client)
+			return 0
+		if args.learn_clear:
+			clear_captures(client)
+			return 0
 		if args.webhook_urls:
 			show_webhook_urls(client, args.host)
 			return 0

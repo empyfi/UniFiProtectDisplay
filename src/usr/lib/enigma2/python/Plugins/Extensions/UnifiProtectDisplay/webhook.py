@@ -51,6 +51,13 @@ BIND_HOST = "0.0.0.0"
 DEFAULT_PORT = 8099
 
 MOTION_SEGMENT = "motion"
+# A catch-all route used while working out what Protect actually sends. It
+# accepts any trailing path, so one URL can be pasted into every alarm.
+LEARN_SEGMENT = "learn"
+
+# Captures are written as JSON lines for tools/configure.py to read back.
+CAPTURE_PATH = "/tmp/unifiprotectdisplay_webhooks.json"
+CAPTURE_LIMIT = 40
 TOKEN_BYTES = 9  # 12 characters of url-safe base64
 
 
@@ -85,6 +92,29 @@ def parse_path(path, token):
 	return camera_id or None
 
 
+def parse_learn_path(path, token):
+	"""True when ``path`` is a learn call carrying the right token.
+
+	Unlike the motion route this accepts anything after the segment, so a
+	single URL can go into every alarm while we find out what distinguishes
+	them.
+	"""
+	if not path or not token:
+		return False
+	path = path.split("?", 1)[0].split("#", 1)[0]
+	parts = [segment for segment in path.split("/") if segment]
+	if len(parts) < 2:
+		return False
+	if not secrets.compare_digest(str(parts[0]), str(token)):
+		return False
+	return parts[1] == LEARN_SEGMENT
+
+
+def learn_url(host, port, token):
+	"""The single URL to paste into every alarm while learning."""
+	return "http://%s:%d/%s/%s" % (host, int(port), token, LEARN_SEGMENT)
+
+
 def motion_url(host, port, token, camera_id):
 	"""The URL to paste into Protect for one camera."""
 	return "http://%s:%d/%s/%s/%s" % (
@@ -100,10 +130,11 @@ class WebhookServer(object):
 	"""
 
 	def __init__(self, port=DEFAULT_PORT, token=None, on_motion=None,
-			log=None, server_factory=None):
+			log=None, server_factory=None, on_learn=None):
 		self.port = int(port or DEFAULT_PORT)
 		self.token = token or generate_token()
 		self._on_motion = on_motion
+		self._on_learn = on_learn
 		self._log = log
 		self._server_factory = server_factory or _make_server
 		self._server = None
@@ -137,8 +168,11 @@ class WebhookServer(object):
 		self._thread = None
 		self._info("motion webhook stopped")
 
-	def handle(self, path, method="GET", body=b""):
+	def handle(self, path, method="GET", body=b"", headers=None):
 		"""Act on one request. Returns the HTTP status to answer with."""
+		if parse_learn_path(path, self.token):
+			self._capture(path, method, body, headers)
+			return 204
 		camera_id = parse_path(path, self.token)
 		if camera_id is None:
 			# Deliberately terse: an unauthenticated caller learns nothing
@@ -154,6 +188,44 @@ class WebhookServer(object):
 				# side, or it will start retrying and logging alarms.
 				self._warn("motion handler failed: %s", exc)
 		return 204
+
+	def _capture(self, path, method, body, headers):
+		"""Record a learn call verbatim, for inspection afterwards.
+
+		Written to a file rather than the log because a payload can be long
+		and the point is to read it whole, once, while working out what
+		Protect sends.
+		"""
+		import json
+		import time
+		entry = {
+			"at": time.strftime("%Y-%m-%d %H:%M:%S"),
+			"method": method,
+			"path": path,
+			"headers": dict(headers or {}),
+			"body": (body or b"").decode("utf-8", "replace"),
+		}
+		self._info("learn call: %s %s, %d bytes of body",
+			method, path, len(body or b""))
+		try:
+			lines = []
+			try:
+				with open(CAPTURE_PATH, "r") as handle:
+					lines = [line for line in handle.read().splitlines()
+						if line.strip()]
+			except (OSError, IOError):
+				lines = []
+			lines.append(json.dumps(entry))
+			with open(CAPTURE_PATH, "w") as handle:
+				for line in lines[-CAPTURE_LIMIT:]:
+					handle.write(line + "\n")
+		except (OSError, IOError, ValueError) as exc:
+			self._warn("could not record the learn call: %s", exc)
+		if self._on_learn is not None:
+			try:
+				self._on_learn(entry)
+			except Exception as exc:  # noqa: BLE001
+				self._warn("learn handler failed: %s", exc)
 
 	def _info(self, message, *args):
 		if self._log is not None:
@@ -187,7 +259,8 @@ def _handler_for(server):
 			self.end_headers()
 
 		def do_GET(self):  # noqa: N802 - name fixed by the base class
-			self._respond(server.handle(self.path, "GET"))
+			self._respond(server.handle(
+				self.path, "GET", b"", dict(self.headers)))
 
 		def do_POST(self):  # noqa: N802
 			# Protect can be set to POST; the body is not needed, but it has
@@ -197,7 +270,8 @@ def _handler_for(server):
 			except (TypeError, ValueError):
 				length = 0
 			body = self.rfile.read(length) if length > 0 else b""
-			self._respond(server.handle(self.path, "POST", body))
+			self._respond(server.handle(
+				self.path, "POST", body, dict(self.headers)))
 
 		def log_message(self, fmt, *args):
 			pass  # the server logs what matters

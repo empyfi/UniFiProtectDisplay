@@ -285,6 +285,7 @@ class DisplayManager(object):
 			port=config.webhook_port.value,
 			token=config.webhook_token.value,
 			on_motion=self._motion_reported,
+			on_learn=self._learn_captured,
 			log=self.log)
 		try:
 			server.start()
@@ -333,6 +334,16 @@ class DisplayManager(object):
 			return "<receiver-ip>"
 		finally:
 			sock.close()
+
+	def _learn_captured(self, entry):
+		"""A call arrived on the learn route; it is already on disk.
+
+		Nothing is decided here: the capture exists so the payload can be
+		read once with tools/configure.py --learn-show, before any rule for
+		extracting the camera is written.
+		"""
+		self.log.info("captured a learn call (%s, %d bytes of body)",
+			entry.get("method"), len(entry.get("body") or ""))
 
 	def _motion_reported(self, camera_id):
 		"""Called from the webhook's own thread -- hand over to the main loop.
