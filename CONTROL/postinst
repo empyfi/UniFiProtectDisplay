@@ -1,0 +1,9 @@
+#!/bin/sh
+echo "UniFi Protect Display installed."
+echo "Set it up under Menu > Plugins > UniFi Protect Display."
+echo
+echo "For live video in a corner you also need a box with PiP and:"
+echo "  opkg install ffmpeg"
+echo "For RTSP playback through GStreamer:"
+echo "  opkg install gstreamer1.0-plugins-good-rtsp gstreamer1.0-plugins-good-rtpmanager"
+exit 0

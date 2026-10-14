@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dist/
+build/
+*.ipk
+*.mo
+src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/locale/
+.idea/
+.vscode/
+*.swp

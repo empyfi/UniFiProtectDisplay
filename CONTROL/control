@@ -1,0 +1,22 @@
+Package: enigma2-plugin-extensions-unifi-protect-display
+Version: 0.1.0
+Architecture: all
+Maintainer: empyfi
+Section: extra
+Priority: optional
+License: GPL-2.0-or-later
+Depends: enigma2
+Recommends: ffmpeg, gstreamer1.0-plugins-good-rtsp, gstreamer1.0-plugins-good-rtpmanager
+Source: https://github.com/empyfi/UniFiProtectDisplay
+Description: Show UniFi Protect cameras on your receiver
+ Displays UniFi Protect cameras in a corner of the screen over live
+ television, or full screen, with optional rotation through several
+ cameras. Cameras are discovered through the Protect Integration API,
+ which also enables each camera's RTSP stream, so no stream URLs have
+ to be copied by hand.
+ .
+ The corner offers two modes. Snapshots work on every receiver and need
+ no extra packages. Live video uses the PiP decoder together with
+ ffmpeg, which remuxes RTSP into MPEG-TS; it needs a box with a second
+ video decoder and the ffmpeg package. The plugin detects which modes
+ the box supports and says why one is unavailable.

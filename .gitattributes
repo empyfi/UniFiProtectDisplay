@@ -1,0 +1,19 @@
+# The target is a Linux set-top box. Everything text keeps LF in the
+# repository *and* in the working tree, on every platform: the maintainer
+# scripts in CONTROL/ are copied verbatim into the .ipk, and a CRLF after
+# "#!/bin/sh" makes opkg fail to run them on the receiver.
+* text=auto eol=lf
+
+# Shell scripts and Python must never be converted, whoever checks them out.
+*.sh text eol=lf
+*.py text eol=lf
+*.po text eol=lf
+*.pot text eol=lf
+CONTROL/postinst text eol=lf
+CONTROL/prerm text eol=lf
+autogen.sh text eol=lf
+
+# Binaries git must not touch.
+*.png binary
+*.mo binary
+*.ipk binary

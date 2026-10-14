@@ -1,0 +1,6 @@
+#!/bin/sh
+# Byte-compiled files are not tracked by the package, so remove them here;
+# a stale .pyc beside a removed .py confuses the plugin loader.
+rm -rf /usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/__pycache__
+rm -rf /usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/*/__pycache__
+exit 0
