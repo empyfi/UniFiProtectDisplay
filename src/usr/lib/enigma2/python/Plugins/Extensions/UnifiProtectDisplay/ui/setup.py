@@ -54,7 +54,7 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 		# these is the only reason to rebuild the list.
 		self._structural = (
 			self._config.corner_mode, self._config.rotate,
-			self._config.follow_pip)
+			self._config.follow_pip, self._config.webhook)
 
 		self["status"] = Label("")
 		self["key_red"] = StaticText(_("Cancel"))
@@ -156,6 +156,28 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 		if cfg.rotate.value:
 			entries.append((_("Change camera every"), cfg.rotate_interval,
 				_("Seconds each camera stays on screen.")))
+
+		entries.extend([
+			_divider(_("Motion")),
+			(_("React to motion reported by Protect"), cfg.webhook,
+				_("Protect's Alarm Manager can call this receiver when a "
+					"camera sees movement. Create an alarm per camera with "
+					"trigger Motion and action Custom Webhook, and paste the "
+					"URL this plugin prints. The Protect API cannot report "
+					"motion by itself.")),
+		])
+		if cfg.webhook.value:
+			entries.extend([
+				(_("Listening port"), cfg.webhook_port,
+					_("The port Protect should call. Must be reachable from "
+						"the console.")),
+				(_("On motion"), cfg.motion_action,
+					_("Whether motion may switch the corner on, or only "
+						"change camera while it is already showing.")),
+				(_("Hold the camera for"), cfg.motion_hold,
+					_("Seconds the camera stays on screen after motion "
+						"before rotation may move on.")),
+			])
 
 		entries.extend([
 			_divider(_("Other")),

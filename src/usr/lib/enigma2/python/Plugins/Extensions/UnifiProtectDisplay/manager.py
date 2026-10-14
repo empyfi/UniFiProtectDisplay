@@ -63,6 +63,8 @@ class DisplayManager(object):
 		self._pip = None
 		self._last_refresh = 0.0
 		self._refresh_task = None
+		self._webhook = None
+		self._motion_until = 0.0
 
 	@classmethod
 	def get(cls, session=None):
@@ -140,6 +142,8 @@ class DisplayManager(object):
 		self.rotation.enabled = config.rotate.value
 		self.rotation.set_cameras(self.store.enabled_ids())
 		self.apply_key_binding()
+		self.stop_webhook()
+		self.start_webhook()
 
 		# Restart only what was already on screen. Saving settings is not a
 		# request to switch the corner on, and a corner appearing by itself
@@ -264,6 +268,117 @@ class DisplayManager(object):
 		return True, ""
 
 	# -- misc -------------------------------------------------------------
+
+	# -- motion, reported by Protect ---------------------------------------
+
+	def start_webhook(self):
+		"""Listen for Protect's alarm webhooks, if configured."""
+		config = settings_module.get_config()
+		if not config.webhook.value or self._webhook is not None:
+			return
+		from .webhook import WebhookServer, generate_token
+		if not config.webhook_token.value:
+			config.webhook_token.value = generate_token()
+			config.webhook_token.save()
+			settings_module.save()
+		server = WebhookServer(
+			port=config.webhook_port.value,
+			token=config.webhook_token.value,
+			on_motion=self._motion_reported,
+			log=self.log)
+		try:
+			server.start()
+		except Exception as exc:  # noqa: BLE001
+			# Most likely the port is taken. Say so rather than failing
+			# silently, since nothing else would hint at it.
+			self.log.error("could not listen for motion on port %s: %s",
+				config.webhook_port.value, exc)
+			return
+		self._webhook = server
+
+	def stop_webhook(self):
+		if self._webhook is not None:
+			self._webhook.stop()
+			self._webhook = None
+
+	def webhook_urls(self):
+		"""The URLs to paste into Protect, one per selected camera."""
+		config = settings_module.get_config()
+		token = config.webhook_token.value
+		if not token:
+			return []
+		from .webhook import motion_url
+		host = self._own_address()
+		port = self._webhook.port if self._webhook else config.webhook_port.value
+		return [
+			(self.store.name_for(cid), motion_url(host, port, token, cid))
+			for cid in self.store.enabled_ids()]
+
+	def _own_address(self):
+		"""This box's address as the console will see it.
+
+		Asked of the routing table by opening a UDP socket towards the
+		console -- no packet is sent, but the kernel picks the source
+		address it would use, which is exactly the one Protect must call.
+		"""
+		import socket
+		config = settings_module.get_config()
+		target = (config.host.value or "").replace("https://", "").strip("/")
+		target = target.split(":")[0] or "8.8.8.8"
+		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		try:
+			sock.connect((target, 443))
+			return sock.getsockname()[0]
+		except OSError:
+			return "<receiver-ip>"
+		finally:
+			sock.close()
+
+	def _motion_reported(self, camera_id):
+		"""Called from the webhook's own thread -- hand over to the main loop.
+
+		The task runner already marshals between the two, so this reuses
+		machinery that is tested rather than inventing a second path.
+		"""
+		self.runner.run(
+			lambda: camera_id, on_success=self._show_motion_camera,
+			name="motion")
+
+	def _show_motion_camera(self, camera_id):
+		config = settings_module.get_config()
+		if camera_id not in self.store.enabled_ids():
+			self.log.info("motion on %s, which is not selected", camera_id)
+			return
+		if not self.corner_running():
+			if config.motion_action.value != "show":
+				return
+			ok, message = self.start_corner()
+			if not ok:
+				self.log.error("could not show the corner on motion: %s", message)
+				return
+		if not self.rotation.select(camera_id):
+			return
+		# Hold this camera briefly so rotation does not slide off it.
+		self._motion_until = time.time() + int(config.motion_hold.value)
+		self.rotation.pause()
+		if self._pip is not None and self._pip.active:
+			self._pip._play_current()
+		elif self._overlay is not None:
+			self._overlay.next_camera()
+		self.log.info("showing camera %s after motion", camera_id)
+		self._arm_motion_release()
+
+	def _arm_motion_release(self):
+		if getattr(self, "_motion_timer", None) is None:
+			self._motion_timer = eTimer()
+			self._motion_timer.callback.append(self._release_motion_hold)
+		self._motion_timer.start(2000, False)
+
+	def _release_motion_hold(self):
+		if time.time() < self._motion_until:
+			return
+		self._motion_timer.stop()
+		self.rotation.resume()
 
 	# -- the PiP key ------------------------------------------------------
 
@@ -418,6 +533,7 @@ class DisplayManager(object):
 
 	def shutdown(self):
 		"""Release everything. Called when the session ends."""
+		self.stop_webhook()
 		self.stop_corner()
 		self.runner.shutdown()
 		DisplayManager.instance = None

@@ -501,3 +501,36 @@ msgstr "Offline-Kameras überspringen"
 
 msgid "A camera the console reports as offline shows nothing. Stepping over it keeps the next-camera button feeling like it did something."
 msgstr "Eine Kamera, die die Konsole als offline meldet, zeigt nichts. Sie zu überspringen sorgt dafür, dass die Weiterschalt-Taste spürbar etwas tut."
+
+msgid "Motion"
+msgstr "Bewegung"
+
+msgid "React to motion reported by Protect"
+msgstr "Auf Bewegung von Protect reagieren"
+
+msgid "Protect's Alarm Manager can call this receiver when a camera sees movement. Create an alarm per camera with trigger Motion and action Custom Webhook, and paste the URL this plugin prints. The Protect API cannot report motion by itself."
+msgstr "Protects Alarm Manager kann diesen Receiver aufrufen, wenn eine Kamera Bewegung sieht. Lege pro Kamera einen Alarm an mit Auslöser Motion und Aktion Custom Webhook und trage die Adresse ein, die dieses Plugin ausgibt. Die Protect-API selbst kann Bewegung nicht melden."
+
+msgid "Listening port"
+msgstr "Port zum Lauschen"
+
+msgid "The port Protect should call. Must be reachable from the console."
+msgstr "Der Port, den Protect aufrufen soll. Muss von der Konsole aus erreichbar sein."
+
+msgid "On motion"
+msgstr "Bei Bewegung"
+
+msgid "Whether motion may switch the corner on, or only change camera while it is already showing."
+msgstr "Ob Bewegung die Ecke einschalten darf oder nur die Kamera wechselt, solange sie ohnehin angezeigt wird."
+
+msgid "Hold the camera for"
+msgstr "Kamera halten für"
+
+msgid "Seconds the camera stays on screen after motion before rotation may move on."
+msgstr "Sekunden, die die Kamera nach Bewegung zu sehen bleibt, bevor die Rotation weiterziehen darf."
+
+msgid "Show the camera, switching the corner on if needed"
+msgstr "Kamera zeigen, Ecke bei Bedarf einschalten"
+
+msgid "Only switch over while the corner is already on"
+msgstr "Nur umschalten, solange die Ecke schon läuft"

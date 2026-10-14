@@ -115,6 +115,20 @@ def init_config():
 	# Takes over the remote's PiP key: short press keeps the box's own
 	# behaviour, long press drives the camera corner.
 	settings.pip_key = ConfigYesNo(default=False)
+
+	# Motion, reported by Protect's Alarm Manager calling in. The token is
+	# generated on first use and lives in the settings; regenerating it
+	# invalidates every URL already pasted into Protect.
+	settings.webhook = ConfigYesNo(default=False)
+	settings.webhook_port = ConfigInteger(default=8099, limits=(1024, 65535))
+	settings.webhook_token = ConfigText(default="", fixed_size=False)
+	settings.motion_action = ConfigSelection(default="show", choices=[
+		("show", _("Show the camera, switching the corner on if needed")),
+		("switch", _("Only switch over while the corner is already on")),
+	])
+	# How long a camera stays on screen after motion before rotation may
+	# move on again.
+	settings.motion_hold = ConfigSelectionNumber(5, 120, 5, default=20)
 	settings.autostart = ConfigYesNo(default=False)
 	settings.debug = ConfigYesNo(default=False)
 	# Fixed port 0 means "ask the OS for a free one", which avoids colliding

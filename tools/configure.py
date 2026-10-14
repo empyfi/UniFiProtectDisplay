@@ -70,6 +70,11 @@ SETTINGS = {
 	"corner_fit": (PLAIN, "fill"),
 	"pip_key": (BOOLEAN, False),
 	"skip_offline": (BOOLEAN, True),
+	"webhook": (BOOLEAN, False),
+	"webhook_port": (PLAIN, "8099"),
+	"webhook_token": (PLAIN, ""),
+	"motion_action": (PLAIN, "show"),
+	"motion_hold": (PLAIN, "20"),
 	"corner": (PLAIN, "topright"),
 	"corner_width": (PLAIN, "25"),
 	"corner_margin": (PLAIN, "2"),
@@ -404,6 +409,27 @@ def build_parser():
 	display.add_argument(
 		"--debug", dest="debug", action="store_true", default=None)
 
+	motion = parser.add_argument_group("motion")
+	motion.add_argument(
+		"--webhook", dest="webhook", action="store_true", default=None,
+		help="listen for motion reported by Protect's Alarm Manager")
+	motion.add_argument(
+		"--no-webhook", dest="webhook", action="store_false")
+	motion.add_argument(
+		"--webhook-port", dest="webhook_port", type=int,
+		help="port Protect should call (default 8099)")
+	motion.add_argument(
+		"--motion-action", dest="motion_action",
+		choices=("show", "switch"),
+		help="show: motion may switch the corner on; switch: only change "
+			"camera while it is already showing")
+	motion.add_argument(
+		"--motion-hold", dest="motion_hold", type=int,
+		help="seconds a camera stays on screen after motion")
+	motion.add_argument(
+		"--webhook-urls", action="store_true",
+		help="print the URLs to paste into Protect, then exit")
+
 	behaviour = parser.add_argument_group("behaviour")
 	behaviour.add_argument(
 		"--reset", action="store_true",
@@ -431,6 +457,8 @@ def collect_overrides(args, api_key):
 		("skip_offline", "skip_offline"),
 		("plain_rtsp", "plain_rtsp"), ("autostart", "autostart"),
 		("corner_fit", "corner_fit"), ("pip_key", "pip_key"),
+		("webhook", "webhook"), ("webhook_port", "webhook_port"),
+		("motion_action", "motion_action"), ("motion_hold", "motion_hold"),
 		("debug", "debug"),
 	)
 	for attribute, setting in mapping:
@@ -441,6 +469,47 @@ def collect_overrides(args, api_key):
 	if api_key:
 		overrides["apikey"] = api_key
 	return overrides
+
+
+def show_webhook_urls(client, box_host):
+	"""Print one webhook URL per selected camera, ready to paste.
+
+	Built here rather than read off the box so the list is available even
+	before Enigma2 has been restarted with the setting switched on.
+	"""
+	values = current_settings(client)
+	if values.get("webhook", "False") != "True":
+		log("Motion reporting is off. Switch it on first:")
+		log("    python tools/configure.py %s --webhook" % box_host)
+		return
+	token = values.get("webhook_token") or ""
+	if not token:
+		log("No token yet - restart Enigma2 once with --webhook on, then "
+			"run this again.")
+		return
+	port = values.get("webhook_port") or "8099"
+
+	raw = read_remote(client, CAMERAS_PATH)
+	try:
+		cameras = [c for c in json.loads(raw) if c.get("enabled")]
+	except ValueError:
+		cameras = []
+	if not cameras:
+		log("No cameras selected.")
+		return
+
+	log("In UniFi Protect: Alarm Manager -> New Alarm, one per camera.")
+	log("  Trigger: Motion     Scope: that camera")
+	log("  Action:  Webhook -> Custom Webhook, method GET")
+	log("")
+	for entry in cameras:
+		log("  %s" % entry.get("name"))
+		log("    http://%s:%s/%s/motion/%s"
+			% (box_host, port, token, entry.get("id")))
+	log("")
+	log("The token keeps a stray request from flipping the television; it is")
+	log("not a strong secret. Re-running after changing it invalidates the")
+	log("URLs already pasted into Protect.")
 
 
 def show(client):
@@ -483,6 +552,9 @@ def main(argv=None):
 
 	client = connect(args)
 	try:
+		if args.webhook_urls:
+			show_webhook_urls(client, args.host)
+			return 0
 		if args.show:
 			show(client)
 			return 0

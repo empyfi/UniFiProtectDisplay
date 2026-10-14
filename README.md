@@ -110,6 +110,31 @@ From the extensions menu (usually the blue button):
   camera, Yellow to pause rotation, EXIT to return to television
 - **UniFi Protect: next camera** — skip ahead
 
+## Motion
+
+Protect's API cannot report motion: the Integration API has no events
+endpoint, its event WebSocket completes the handshake and then delivers
+nothing, and the private API the web interface uses rejects an API key. All
+three were measured against a live console.
+
+Protect's **Alarm Manager** can call out, though, so the direction is
+reversed — the console tells the receiver, which needs no connection kept
+alive. Switch on *React to motion reported by Protect*, then print the URLs:
+
+```bash
+python tools/configure.py <box-ip> --webhook
+python tools/configure.py <box-ip> --webhook-urls
+```
+
+In Protect: **Alarm Manager → New Alarm**, one per camera — trigger
+**Motion**, scope that camera, action **Webhook → Custom Webhook**, method
+GET, and paste the matching URL.
+
+When motion is reported the camera is brought up, switching the corner on if
+it is off, and held there briefly so rotation does not slide away. The URL
+carries a token so a stray request cannot flip the television; it is not a
+strong secret, and regenerating it invalidates URLs already pasted.
+
 ## Notes and limits
 
 - **H.265 cameras.** Protect's "Enhanced" encoding is H.265. Older boxes
