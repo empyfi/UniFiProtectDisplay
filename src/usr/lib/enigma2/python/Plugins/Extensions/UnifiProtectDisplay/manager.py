@@ -12,6 +12,8 @@ being re-derived in three.
 A single instance per enigma2 session, created at session start.
 """
 
+import time
+
 from enigma import eTimer
 
 from . import settings as settings_module
@@ -24,6 +26,13 @@ from .protect.api import ProtectApi
 from .rotation import Rotation
 from .settings import MODE_OFF, MODE_PIP, MODE_SNAPSHOT
 from .localisation import _
+
+
+# How often the camera list may be re-fetched while switching around.
+# Without a floor, holding the next-camera button would fire one request per
+# press; with it, a camera that has just come back is picked up within a few
+# seconds, which is as precise as "is it online" can usefully be.
+REFRESH_INTERVAL = 5.0
 
 
 class DisplayManager(object):
@@ -52,6 +61,8 @@ class DisplayManager(object):
 
 		self._overlay = None
 		self._pip = None
+		self._last_refresh = 0.0
+		self._refresh_task = None
 
 	@classmethod
 	def get(cls, session=None):
@@ -61,6 +72,39 @@ class DisplayManager(object):
 		return cls.instance
 
 	# -- configuration ----------------------------------------------------
+
+	def note_camera_shown(self, force=False):
+		"""Re-check which cameras are reachable, in the background.
+
+		Called whenever a camera is put on screen or switched, because the
+		offline flag only matters at that moment and is otherwise as old as
+		the last camera-list fetch. It never blocks the picture: the result
+		arrives later and only changes which cameras stepping will skip.
+		"""
+		now = time.time()
+		if not force and now - self._last_refresh < REFRESH_INTERVAL:
+			return
+		if self._refresh_task is not None:
+			return  # one in flight is enough
+		if not self.api.is_configured():
+			return
+		self._last_refresh = now
+		self._refresh_task = self.controller.refresh_cameras(
+			on_done=self._state_refreshed, on_error=self._refresh_failed)
+
+	def _state_refreshed(self, counts):
+		self._refresh_task = None
+		# Keep the cursor on its camera; only the usable set may have moved.
+		self.rotation.set_cameras(self.store.enabled_ids())
+		added, removed = counts
+		if added or removed:
+			self.log.info("camera list changed: %d new, %d gone", added, removed)
+
+	def _refresh_failed(self, exc):
+		self._refresh_task = None
+		# A failed refresh is not worth disturbing playback over; the
+		# previous state simply stays in force.
+		self.log.debug("camera list refresh failed: %s", exc)
 
 	def _camera_usable(self, camera_id):
 		"""Skip cameras the console last reported as offline.
@@ -130,6 +174,7 @@ class DisplayManager(object):
 		if not self.rotation.camera_ids():
 			return False, _(
 				"No cameras are selected. Open the camera list first.")
+		self.note_camera_shown(force=True)
 		if mode == MODE_SNAPSHOT:
 			return self._start_snapshot(config)
 		if mode == MODE_PIP:
@@ -148,6 +193,7 @@ class DisplayManager(object):
 				interval=config.snapshot_interval.value,
 				rotate_interval=config.rotate_interval.value,
 				follow_pip=config.follow_pip.value,
+				on_camera_shown=self.note_camera_shown,
 				log=self.log)
 			self._overlay.show()
 		except Exception as exc:  # noqa: BLE001
@@ -167,6 +213,7 @@ class DisplayManager(object):
 			proxy_port=config.proxy_port.value,
 			follow_pip=config.follow_pip.value,
 			fit=config.corner_fit.value,
+			on_camera_shown=self.note_camera_shown,
 			log=self.log)
 		ok, message = self._pip.start()
 		if not ok:
@@ -204,6 +251,7 @@ class DisplayManager(object):
 		if not self.rotation.camera_ids():
 			return False, _(
 				"No cameras are selected. Open the camera list first.")
+		self.note_camera_shown(force=True)
 		self.stop_corner()
 		from .player.fullscreen import FullscreenViewer
 		config = settings_module.get_config()
@@ -211,7 +259,8 @@ class DisplayManager(object):
 			FullscreenViewer, self.controller, self.rotation,
 			rotate_interval=config.rotate_interval.value, log=self.log,
 			capabilities=self.capabilities,
-			proxy_port=config.proxy_port.value)
+			proxy_port=config.proxy_port.value,
+			on_camera_shown=self.note_camera_shown)
 		return True, ""
 
 	# -- misc -------------------------------------------------------------
@@ -359,6 +408,7 @@ class DisplayManager(object):
 		return True
 
 	def next_camera(self):
+		self.note_camera_shown()
 		if self._overlay is not None:
 			self._overlay.next_camera()
 		elif self._pip is not None and self._pip.active:

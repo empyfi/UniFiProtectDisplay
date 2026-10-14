@@ -55,7 +55,7 @@ class PipCorner(object):
 			corner="topright", width_percent=25, margin_percent=2,
 			rotate_interval=15, proxy_port=0, log=None, proxy=None,
 			follow_pip=True, aspect=geometry.DEFAULT_ASPECT,
-			fit=geometry.FIT_FILL):
+			fit=geometry.FIT_FILL, on_camera_shown=None):
 		self.session = session
 		self._controller = controller
 		self._rotation = rotation
@@ -67,6 +67,9 @@ class PipCorner(object):
 		self._follow_pip = follow_pip
 		self._aspect = aspect
 		self._fit = fit
+		# Told whenever a camera reaches the screen, so the manager can
+		# re-check which cameras are reachable.
+		self._on_camera_shown = on_camera_shown
 		self._log = log
 		self._proxy = proxy or TsProxy(
 			ffmpeg_path=(capabilities.which("ffmpeg") or "ffmpeg")
@@ -159,6 +162,8 @@ class PipCorner(object):
 		camera_id = self._rotation.current()
 		if camera_id is None:
 			return
+		if self._on_camera_shown is not None:
+			self._on_camera_shown()
 		if self._pending is not None:
 			self._pending.cancel()
 		name = self._controller.store.name_for(camera_id)

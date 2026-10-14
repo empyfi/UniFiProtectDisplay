@@ -56,7 +56,7 @@ class SnapshotOverlay(Screen):
 
 	def __init__(self, session, controller, rotation, corner="topright",
 			width_percent=25, margin_percent=2, interval=2, rotate_interval=15,
-			follow_pip=True, log=None):
+			follow_pip=True, on_camera_shown=None, log=None):
 		self._controller = controller
 		self._rotation = rotation
 		self._log = log
@@ -68,6 +68,7 @@ class SnapshotOverlay(Screen):
 		self._pending = None
 		self._decoding = False
 		self._showing_error = False
+		self._on_camera_shown = on_camera_shown
 
 		desktop_size = _desktop_size(session)
 		if follow_pip:
@@ -140,6 +141,8 @@ class SnapshotOverlay(Screen):
 			if self._rotation.should_rotate():
 				self._rotation.advance()
 				self._update_label()
+				if self._on_camera_shown is not None:
+					self._on_camera_shown()
 		self._request()
 
 	def _request(self):

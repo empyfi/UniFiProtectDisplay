@@ -46,13 +46,15 @@ class FullscreenViewer(Screen):
 		</screen>"""
 
 	def __init__(self, session, controller, rotation, rotate_interval=15,
-			log=None, capabilities=None, proxy_port=0):
+			log=None, capabilities=None, proxy_port=0,
+			on_camera_shown=None):
 		Screen.__init__(self, session)
 		self._controller = controller
 		self._rotation = rotation
 		self._log = log
 		self._capabilities = capabilities
 		self._proxy_port = proxy_port
+		self._on_camera_shown = on_camera_shown
 		# Protect serves rtsps:// with ?enableSrtp. GStreamer's rtspsrc does
 		# not do SRTP, so handing it that URL yields a black screen with no
 		# error worth the name. ffmpeg handles it, so when ffmpeg is present
@@ -125,6 +127,8 @@ class FullscreenViewer(Screen):
 		if camera_id is None:
 			self["status"].setText(_("No camera selected"))
 			return
+		if self._on_camera_shown is not None:
+			self._on_camera_shown()
 		name = self._controller.store.name_for(camera_id)
 		self["caption"].setText(name)
 		self["status"].setText(_("Connecting..."))
