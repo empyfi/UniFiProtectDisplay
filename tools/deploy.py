@@ -90,6 +90,35 @@ def build_if_needed(force=False):
 
 # -- connection -----------------------------------------------------------
 
+def find_private_keys():
+	"""Every private key in ~/.ssh, most recently modified first.
+
+	A key generated for one particular receiver is usually named after it,
+	which the standard search would miss. Public keys, known_hosts, config
+	and the agent socket are skipped by shape rather than by name, so an
+	unusual naming scheme still works.
+	"""
+	ssh_dir = os.path.expanduser("~/.ssh")
+	if not os.path.isdir(ssh_dir):
+		return []
+	skip_names = {"known_hosts", "known_hosts2", "config", "authorized_keys"}
+	found = []
+	for name in os.listdir(ssh_dir):
+		if name in skip_names or name.endswith((".pub", ".ppk")):
+			continue
+		path = os.path.join(ssh_dir, name)
+		if not os.path.isfile(path):
+			continue
+		try:
+			with open(path, "r", encoding="utf-8", errors="ignore") as handle:
+				if "PRIVATE KEY" in handle.read(200):
+					found.append(path)
+		except OSError:
+			continue
+	found.sort(key=os.path.getmtime, reverse=True)
+	return found
+
+
 def connect(host, user, port, key_path, timeout):
 	try:
 		import paramiko
@@ -109,8 +138,19 @@ def connect(host, user, port, key_path, timeout):
 			"key_filename": os.path.expanduser(key_path),
 			"look_for_keys": False, "allow_agent": False}))
 	else:
-		attempts.append(("ssh agent or default key", {
-			"look_for_keys": True, "allow_agent": True}))
+		# paramiko's look_for_keys only considers the standard file names
+		# (id_rsa, id_ecdsa, id_ed25519), so a key named after the box it
+		# belongs to would be ignored. Offer every private key in ~/.ssh,
+		# which is what makes "it just connects" true after a one-time
+		# ssh-copy-id.
+		discovered = find_private_keys()
+		if discovered:
+			attempts.append(("key %s" % os.path.basename(discovered[0]), {
+				"key_filename": discovered,
+				"look_for_keys": True, "allow_agent": True}))
+		else:
+			attempts.append(("ssh agent or default key", {
+				"look_for_keys": True, "allow_agent": True}))
 
 	password = os.environ.get("E2_PASSWORD")
 	if password:
