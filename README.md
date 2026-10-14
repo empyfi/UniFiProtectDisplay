@@ -136,6 +136,23 @@ python tools/extract_strings.py   # regenerate po/UnifiProtectDisplay.pot
 python build.py                   # produce dist/*.ipk
 ```
 
+To put a build on a receiver, including a report of what that box can do:
+
+```bash
+pip install paramiko
+python tools/deploy.py 192.168.1.50            # probe, build, install, restart
+python tools/deploy.py 192.168.1.50 --probe-only   # change nothing
+python tools/deploy.py 192.168.1.50 --log-only     # just read the plugin's log
+```
+
+It authenticates with an SSH key, the agent, `E2_PASSWORD`, or a prompt, in
+that order. A key is worth the one-time setup — it survives a password change
+and keeps the password out of your shell history:
+
+```bash
+ssh-copy-id -i ~/.ssh/id_ed25519_box.pub root@192.168.1.50
+```
+
 Everything that can be tested off the box is kept free of `enigma` imports —
 API client, service-reference escaping, geometry, rotation, capability
 probing, the camera store and the orchestration layer. Enigma2 is confined to
