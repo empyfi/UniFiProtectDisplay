@@ -123,3 +123,73 @@ def corner_label(corner):
 		CORNER_BOTTOM_LEFT: "bottom left",
 		CORNER_BOTTOM_RIGHT: "bottom right",
 	}.get(corner, corner)
+
+
+# Enigma2's own default for config.av.pip, used when that entry does not
+# exist yet -- it is only created the first time PictureInPicture is built.
+PIP_DEFAULT_RECT = (510, 28, 180, 135)
+
+
+def letterbox(outer_width, outer_height, aspect=DEFAULT_ASPECT):
+	"""Centre an ``aspect``-correct rectangle inside a given one.
+
+	Returns ``(x, y, width, height)`` relative to the outer rectangle. The
+	camera keeps its proportions and the leftover becomes bars, rather than
+	the picture being stretched to fill a window whose shape it does not
+	share. Which way the bars fall follows from the two shapes: a 16:9
+	camera in a 4:3 window gets bars above and below, the reverse gets them
+	at the sides.
+	"""
+	outer_width = max(1, int(outer_width))
+	outer_height = max(1, int(outer_height))
+	aspect = float(aspect or DEFAULT_ASPECT)
+	if aspect <= 0:
+		aspect = DEFAULT_ASPECT
+
+	width = outer_width
+	height = max(1, int(round(width / aspect)))
+	if height > outer_height:
+		height = outer_height
+		width = max(1, int(round(height * aspect)))
+
+	x = (outer_width - width) // 2
+	y = (outer_height - height) // 2
+	return x, y, width, height
+
+
+def pip_config_rect(values=None):
+	"""Normalise ``config.av.pip`` into ``(x, y, width, height)``.
+
+	Falls back to enigma2's default for anything missing or malformed, so a
+	config that has never been written still yields the geometry the user
+	actually sees.
+	"""
+	default = PIP_DEFAULT_RECT
+	if not values:
+		return default
+	try:
+		rect = tuple(int(values[index]) for index in range(4))
+	except (TypeError, ValueError, IndexError, KeyError):
+		return default
+	if rect[2] <= 0 or rect[3] <= 0:
+		return default
+	return rect
+
+
+def to_skin_space(rect, skin_width, skin_height):
+	"""Scale a rectangle from PiP's 720x576 grid into skin coordinates.
+
+	The snapshot overlay is an ordinary Screen and therefore lives in skin
+	space, but the geometry it has to match is stored in PiP space. Without
+	this conversion a window copied from config.av.pip would land at a
+	quarter of its intended size on a 1080p skin.
+	"""
+	x, y, width, height = rect
+	scale_x = float(skin_width) / PIP_SPACE_WIDTH
+	scale_y = float(skin_height) / PIP_SPACE_HEIGHT
+	return (
+		int(round(x * scale_x)),
+		int(round(y * scale_y)),
+		max(1, int(round(width * scale_x))),
+		max(1, int(round(height * scale_y))),
+	)

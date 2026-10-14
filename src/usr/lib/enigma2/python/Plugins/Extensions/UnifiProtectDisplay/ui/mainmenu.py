@@ -150,6 +150,8 @@ class UnifiProtectMain(Screen):
 	def _corner_description(self):
 		from .. import geometry
 		config = get_config()
+		if config.follow_pip.value:
+			return _("same window as Picture in Picture")
 		return _("%s, %s%% wide") % (
 			geometry.corner_label(config.corner.value),
 			config.corner_width.value)

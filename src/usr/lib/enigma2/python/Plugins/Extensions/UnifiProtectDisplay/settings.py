@@ -85,6 +85,10 @@ def init_config():
 		(MODE_SNAPSHOT, _("Snapshots (works on every box)")),
 		(MODE_PIP, _("Live video (PiP, needs ffmpeg)")),
 	])
+	# Default: use the window the user already arranged for Picture-in-
+	# Picture, rather than making them position a second small window for
+	# the same decoder.
+	settings.follow_pip = ConfigYesNo(default=True)
 	settings.corner = ConfigSelection(
 		default=CORNER_TOP_RIGHT, choices=CORNER_CHOICES)
 	settings.corner_width = ConfigSelectionNumber(

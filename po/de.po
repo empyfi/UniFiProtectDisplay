@@ -441,3 +441,15 @@ msgstr "%s, %s%% breit"
 
 msgid "  (offline)"
 msgstr "  (offline)"
+
+msgid "Could not prepare the stream for playback."
+msgstr "Der Stream konnte nicht für die Wiedergabe vorbereitet werden."
+
+msgid "Same size as Picture in Picture"
+msgstr "Gleiche Größe wie Bild-in-Bild"
+
+msgid "Use the window you already set up for Picture in Picture, at that position and size. The camera is letterboxed inside it if the shapes differ. Adjust that window with the box's own PiP settings."
+msgstr "Verwendet das Fenster, das du bereits für Bild-in-Bild eingerichtet hast, an derselben Position und in derselben Größe. Weicht das Seitenverhältnis ab, wird das Kamerabild darin mit Balken eingepasst. Dieses Fenster stellst du in den Bild-in-Bild-Einstellungen der Box ein."
+
+msgid "same window as Picture in Picture"
+msgstr "gleiches Fenster wie Bild-in-Bild"

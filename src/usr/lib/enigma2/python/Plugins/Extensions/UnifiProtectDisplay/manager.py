@@ -131,6 +131,7 @@ class DisplayManager(object):
 				margin_percent=config.corner_margin.value,
 				interval=config.snapshot_interval.value,
 				rotate_interval=config.rotate_interval.value,
+				follow_pip=config.follow_pip.value,
 				log=self.log)
 			self._overlay.show()
 		except Exception as exc:  # noqa: BLE001
@@ -148,6 +149,7 @@ class DisplayManager(object):
 			margin_percent=config.corner_margin.value,
 			rotate_interval=config.rotate_interval.value,
 			proxy_port=config.proxy_port.value,
+			follow_pip=config.follow_pip.value,
 			log=self.log)
 		ok, message = self._pip.start()
 		if not ok:
@@ -190,7 +192,9 @@ class DisplayManager(object):
 		config = settings_module.get_config()
 		self.session.open(
 			FullscreenViewer, self.controller, self.rotation,
-			rotate_interval=config.rotate_interval.value, log=self.log)
+			rotate_interval=config.rotate_interval.value, log=self.log,
+			capabilities=self.capabilities,
+			proxy_port=config.proxy_port.value)
 		return True, ""
 
 	# -- misc -------------------------------------------------------------

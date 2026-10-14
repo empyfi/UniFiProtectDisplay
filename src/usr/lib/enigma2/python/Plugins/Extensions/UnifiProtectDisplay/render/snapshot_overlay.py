@@ -56,7 +56,7 @@ class SnapshotOverlay(Screen):
 
 	def __init__(self, session, controller, rotation, corner="topright",
 			width_percent=25, margin_percent=2, interval=2, rotate_interval=15,
-			log=None):
+			follow_pip=True, log=None):
 		self._controller = controller
 		self._rotation = rotation
 		self._log = log
@@ -70,9 +70,18 @@ class SnapshotOverlay(Screen):
 		self._showing_error = False
 
 		desktop_size = _desktop_size(session)
-		rect = geometry.skin_rect(
-			corner, desktop_size[0], desktop_size[1], width_percent,
-			margin_percent)
+		if follow_pip:
+			# Match the box's own PiP window, so both corner modes appear in
+			# the same place and only one geometry has to be set up. That
+			# geometry lives in PiP's fixed 720x576 grid and has to be
+			# scaled into skin space here.
+			rect = geometry.to_skin_space(
+				geometry.pip_config_rect(_pip_values()),
+				desktop_size[0], desktop_size[1])
+		else:
+			rect = geometry.skin_rect(
+				corner, desktop_size[0], desktop_size[1], width_percent,
+				margin_percent)
 		self._rect = rect
 		self.skin = _build_skin(rect)
 		Screen.__init__(self, session)
@@ -270,6 +279,15 @@ def _build_skin(rect):
 		width, height,
 		height - label_height, width, label_height,
 		max(14, label_height - 6))
+
+
+def _pip_values():
+	"""config.av.pip as a plain list, or None when enigma2 has not made it."""
+	try:
+		from Components.config import config
+		return list(config.av.pip.value)
+	except (AttributeError, TypeError, ImportError):
+		return None
 
 
 def _desktop_size(session):

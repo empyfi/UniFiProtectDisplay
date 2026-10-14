@@ -66,6 +66,7 @@ SETTINGS = {
 	"plain_rtsp": (BOOLEAN, False),
 	"player": (PLAIN, "auto"),
 	"corner_mode": (PLAIN, "off"),
+	"follow_pip": (BOOLEAN, True),
 	"corner": (PLAIN, "topright"),
 	"corner_width": (PLAIN, "25"),
 	"corner_margin": (PLAIN, "2"),
@@ -356,6 +357,12 @@ def build_parser():
 	display.add_argument(
 		"--mode", choices=("off", "snapshot", "pip"), help="corner mode")
 	display.add_argument(
+		"--follow-pip", dest="follow_pip", action="store_true", default=None,
+		help="size the corner exactly like the box's own PiP window")
+	display.add_argument(
+		"--own-corner", dest="follow_pip", action="store_false",
+		help="use the plugin's own corner position and width instead")
+	display.add_argument(
 		"--corner",
 		choices=("topright", "topleft", "bottomright", "bottomleft"))
 	display.add_argument("--width", type=int, help="corner width in %% (10-60)")
@@ -400,6 +407,7 @@ def collect_overrides(args, api_key):
 	overrides = {}
 	mapping = (
 		("console", "host"), ("verify_ssl", "verify_ssl"), ("mode", "corner_mode"),
+		("follow_pip", "follow_pip"),
 		("corner", "corner"), ("width", "corner_width"),
 		("margin", "corner_margin"), ("quality", "quality"),
 		("player", "player"), ("interval", "snapshot_interval"),

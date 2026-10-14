@@ -53,7 +53,8 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 		# The settings that decide which other rows exist. Changing one of
 		# these is the only reason to rebuild the list.
 		self._structural = (
-			self._config.corner_mode, self._config.rotate)
+			self._config.corner_mode, self._config.rotate,
+			self._config.follow_pip)
 
 		self["status"] = Label("")
 		self["key_red"] = StaticText(_("Cancel"))
@@ -99,15 +100,21 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 		]
 
 		if cfg.corner_mode.value != MODE_OFF:
-			entries.extend([
-				(_("Position"), cfg.corner,
-					_("Which corner of the screen the camera appears in.")),
-				(_("Width"), cfg.corner_width,
-					_("Width as a percentage of the screen. The height "
-						"follows at 16:9.")),
-				(_("Margin"), cfg.corner_margin,
-					_("Distance from the screen edge, as a percentage.")),
-			])
+			entries.append((_("Same size as Picture in Picture"), cfg.follow_pip,
+				_("Use the window you already set up for Picture in "
+					"Picture, at that position and size. The camera is "
+					"letterboxed inside it if the shapes differ. Adjust that "
+					"window with the box's own PiP settings.")))
+			if not cfg.follow_pip.value:
+				entries.extend([
+					(_("Position"), cfg.corner,
+						_("Which corner of the screen the camera appears in.")),
+					(_("Width"), cfg.corner_width,
+						_("Width as a percentage of the screen. The height "
+							"follows at 16:9.")),
+					(_("Margin"), cfg.corner_margin,
+						_("Distance from the screen edge, as a percentage.")),
+				])
 		if cfg.corner_mode.value == MODE_SNAPSHOT:
 			entries.extend([
 				(_("Refresh every"), cfg.snapshot_interval,

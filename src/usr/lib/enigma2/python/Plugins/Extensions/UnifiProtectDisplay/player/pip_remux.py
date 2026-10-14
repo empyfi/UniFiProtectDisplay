@@ -53,7 +53,8 @@ class PipCorner(object):
 
 	def __init__(self, session, controller, rotation, capabilities,
 			corner="topright", width_percent=25, margin_percent=2,
-			rotate_interval=15, proxy_port=0, log=None, proxy=None):
+			rotate_interval=15, proxy_port=0, log=None, proxy=None,
+			follow_pip=True, aspect=geometry.DEFAULT_ASPECT):
 		self.session = session
 		self._controller = controller
 		self._rotation = rotation
@@ -62,6 +63,8 @@ class PipCorner(object):
 		self._width_percent = width_percent
 		self._margin_percent = margin_percent
 		self._rotate_interval = max(1, int(rotate_interval))
+		self._follow_pip = follow_pip
+		self._aspect = aspect
 		self._log = log
 		self._proxy = proxy or TsProxy(
 			ffmpeg_path=(capabilities.which("ffmpeg") or "ffmpeg")
@@ -257,28 +260,53 @@ class PipCorner(object):
 	# -- the user's PiP geometry ------------------------------------------
 
 	def _apply_geometry(self):
-		"""Place the PiP window in the chosen corner, on screen only.
+		"""Size the window exactly like the box's own Picture-in-Picture.
 
-		Deliberately not ``PictureInPicture.move()`` / ``.resize()``: those
-		write the new position and size into ``config.av.pip`` and save it,
-		which would overwrite the user's own PiP geometry for good. Moving
-		the widgets directly has the same visible effect and leaves the
-		configuration untouched.
+		The camera is shown in the window the user already arranged for PiP,
+		at that position and that size, because having two differently
+		placed small windows for the same hardware decoder is confusing and
+		means setting the same thing twice.
+
+		The video inside is letterboxed rather than stretched: a 16:9 camera
+		in enigma2's 4:3-ish default window would otherwise be visibly
+		squashed. Bars cost a little picture; distortion costs more.
+
+		Still not via ``PictureInPicture.move()`` / ``.resize()`` -- those
+		persist into ``config.av.pip``, and reading the user's geometry must
+		not end up rewriting it.
 		"""
-		x, y, width, height = geometry.pip_rect(
-			self._corner, self._width_percent, self._margin_percent)
+		if self._follow_pip:
+			rect = geometry.pip_config_rect(self._current_pip_values())
+		else:
+			rect = geometry.pip_rect(
+				self._corner, self._width_percent, self._margin_percent)
+		x, y, width, height = rect
+
 		pip = self.session.pip
 		try:
 			pip.instance.move(ePoint(x, y))
 			pip.instance.resize(eSize(width, height))
-			# The video widget inside the window has to follow, or the
-			# picture keeps the old size within a resized frame.
-			pip["video"].instance.resize(eSize(width, height))
-		except (AttributeError, RuntimeError) as exc:
+			# The video widget is positioned inside the window, so the bars
+			# are simply the part of the window it does not cover.
+			vx, vy, vwidth, vheight = geometry.letterbox(
+				width, height, self._aspect)
+			video = pip["video"].instance
+			video.move(ePoint(vx, vy))
+			video.resize(eSize(vwidth, vheight))
+		except (AttributeError, RuntimeError, KeyError) as exc:
 			self._error("could not place the PiP window: %s", exc)
 			return
-		self._info("PiP corner at %d,%d %dx%d (in PiP's 720x576 space)",
-			x, y, width, height)
+		self._info("PiP corner at %d,%d %dx%d, video %dx%d at +%d+%d",
+			x, y, width, height, vwidth, vheight, vx, vy)
+
+	def _current_pip_values(self):
+		"""config.av.pip as a plain list, or None when it does not exist."""
+		try:
+			return list(config.av.pip.value)
+		except (AttributeError, TypeError):
+			# Created by PictureInPicture itself; absent on first ever use,
+			# in which case the enigma2 default is the right answer.
+			return None
 
 	def _borrow_standard_mode(self):
 		"""Switch PiP to "standard" placement in memory only.

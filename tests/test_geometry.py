@@ -97,3 +97,86 @@ class TestLabels:
 	def test_every_corner_has_a_label(self, corner):
 		label = geo.corner_label(corner)
 		assert label and label != corner
+
+
+class TestLetterbox:
+	def test_wide_camera_in_a_squarer_window_gets_bars_top_and_bottom(self):
+		# enigma2's default PiP window is 180x135, close to 4:3; a 16:9
+		# camera must keep its shape rather than be squashed into it.
+		x, y, w, h = geo.letterbox(180, 135, 16.0 / 9.0)
+		assert (x, w) == (0, 180)
+		assert y > 0 and h < 135
+		assert abs(w / float(h) - 16.0 / 9.0) < 0.05
+
+	def test_square_camera_in_a_wide_window_gets_bars_at_the_sides(self):
+		x, y, w, h = geo.letterbox(320, 180, 1.0)
+		assert (y, h) == (0, 180)
+		assert x > 0 and w < 320
+		assert w == h
+
+	def test_matching_aspect_fills_the_window(self):
+		assert geo.letterbox(320, 180, 16.0 / 9.0) == (0, 0, 320, 180)
+
+	def test_result_always_fits_inside(self):
+		for outer in ((180, 135), (320, 180), (100, 300), (1, 1)):
+			for aspect in (16 / 9.0, 4 / 3.0, 1.0, 0.5, 3.0):
+				x, y, w, h = geo.letterbox(outer[0], outer[1], aspect)
+				assert x >= 0 and y >= 0
+				assert x + w <= outer[0]
+				assert y + h <= outer[1]
+				assert w >= 1 and h >= 1
+
+	def test_it_is_centred(self):
+		x, y, w, h = geo.letterbox(200, 200, 16.0 / 9.0)
+		assert abs((200 - w) // 2 - x) <= 1
+		assert abs((200 - h) // 2 - y) <= 1
+
+	@pytest.mark.parametrize("aspect", [0, None, -1])
+	def test_a_nonsense_aspect_falls_back(self, aspect):
+		x, y, w, h = geo.letterbox(320, 180, aspect)
+		assert w > 0 and h > 0
+
+
+class TestPipConfigRect:
+	def test_missing_config_yields_the_enigma2_default(self):
+		# config.av.pip only exists once PictureInPicture has been built.
+		assert geo.pip_config_rect(None) == geo.PIP_DEFAULT_RECT
+		assert geo.pip_config_rect([]) == geo.PIP_DEFAULT_RECT
+
+	def test_reads_a_stored_rectangle(self):
+		assert geo.pip_config_rect([400, 60, 250, 141]) == (400, 60, 250, 141)
+
+	def test_strings_are_accepted(self):
+		# ConfigSequence values arrive as ints, but a hand-edited settings
+		# file is not guaranteed to.
+		assert geo.pip_config_rect(["400", "60", "250", "141"]) == (
+			400, 60, 250, 141)
+
+	@pytest.mark.parametrize("values", [
+		[400, 60, 0, 141], [400, 60, 250, 0], [1, 2], ["x", "y", "z", "w"]])
+	def test_malformed_values_fall_back(self, values):
+		assert geo.pip_config_rect(values) == geo.PIP_DEFAULT_RECT
+
+
+class TestToSkinSpace:
+	def test_scales_from_pip_space_to_the_skin(self):
+		# Passing PiP coordinates to a Screen unconverted would land the
+		# window at a fraction of its intended size on an HD skin.
+		rect = geo.to_skin_space((510, 28, 180, 135), 1280, 720)
+		assert rect[0] == round(510 * 1280 / 720.0)
+		assert rect[2] == round(180 * 1280 / 720.0)
+
+	def test_identity_at_pip_resolution(self):
+		rect = (510, 28, 180, 135)
+		assert geo.to_skin_space(
+			rect, geo.PIP_SPACE_WIDTH, geo.PIP_SPACE_HEIGHT) == rect
+
+	def test_stays_on_screen(self):
+		for skin in ((1280, 720), (1920, 1080), (720, 576)):
+			x, y, w, h = geo.to_skin_space((510, 28, 180, 135), *skin)
+			assert x + w <= skin[0] + 1
+			assert y + h <= skin[1] + 1
+
+	def test_proportions_are_preserved(self):
+		_, _, w, h = geo.to_skin_space((0, 0, 180, 135), 1440, 1152)
+		assert (w, h) == (360, 270)

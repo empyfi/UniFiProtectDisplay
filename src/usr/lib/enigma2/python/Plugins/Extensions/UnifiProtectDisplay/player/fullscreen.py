@@ -17,6 +17,7 @@ from Components.Label import Label
 from Screens.Screen import Screen
 
 from .. import servicerefs
+from .tsproxy import TsProxy
 from ..localisation import _
 
 
@@ -45,11 +46,21 @@ class FullscreenViewer(Screen):
 		</screen>"""
 
 	def __init__(self, session, controller, rotation, rotate_interval=15,
-			log=None):
+			log=None, capabilities=None, proxy_port=0):
 		Screen.__init__(self, session)
 		self._controller = controller
 		self._rotation = rotation
 		self._log = log
+		self._capabilities = capabilities
+		self._proxy_port = proxy_port
+		# Protect serves rtsps:// with ?enableSrtp. GStreamer's rtspsrc does
+		# not do SRTP, so handing it that URL yields a black screen with no
+		# error worth the name. ffmpeg handles it, so when ffmpeg is present
+		# the stream is remuxed through the same loopback proxy the PiP
+		# corner uses and played as plain HTTP MPEG-TS, which every player
+		# on these images reads. Without ffmpeg we still try the direct URL:
+		# it works for plain rtsp:// and costs nothing to attempt.
+		self._proxy = None
 		self._rotate_interval = max(1, int(rotate_interval))
 		self._previous_service = None
 		self._pending = None
@@ -89,6 +100,11 @@ class FullscreenViewer(Screen):
 	def _stopped(self):
 		self._closing = True
 		self._timer.stop()
+		if self._proxy is not None:
+			# Stopping the proxy kills ffmpeg, so no camera traffic survives
+			# the viewer being closed.
+			self._proxy.stop()
+			self._proxy = None
 		if self._pending is not None:
 			self._pending.cancel()
 			self._pending = None
@@ -119,15 +135,39 @@ class FullscreenViewer(Screen):
 			on_done=lambda url: self._play_url(url, camera_id, name),
 			on_error=self._failed)
 
-	def _play_url(self, url, camera_id, name):
+	def _play_url(self, rtsp_url, camera_id, name):
 		self._pending = None
 		if self._closing:
 			return
+		url, via = self._playable_url(rtsp_url, camera_id)
+		if url is None:
+			self["status"].setText(
+				_("Could not prepare the stream for playback."))
+			return
 		player = self._controller.player_name()
 		reference = servicerefs.build_stream_reference(url, name, player)
-		self._info("playing camera %s with %s", camera_id, player)
+		self._info("playing camera %s with %s (%s)", camera_id, player, via)
 		self.session.nav.playService(eServiceReference(reference))
 		self["status"].setText("")
+
+	def _playable_url(self, rtsp_url, camera_id):
+		"""Return a URL this box can actually play, and how it was obtained."""
+		has_ffmpeg = self._capabilities is None or self._capabilities.has_ffmpeg()
+		if not has_ffmpeg:
+			return rtsp_url, "direct RTSP, no ffmpeg available"
+		try:
+			if self._proxy is None:
+				ffmpeg = (self._capabilities.which("ffmpeg")
+					if self._capabilities else None) or "ffmpeg"
+				self._proxy = TsProxy(
+					ffmpeg_path=ffmpeg, port=self._proxy_port, log=self._log)
+				self._proxy.start()
+			return self._proxy.register(camera_id, rtsp_url), "ffmpeg remux"
+		except Exception as exc:  # noqa: BLE001
+			# Falling back beats failing: a direct URL may still work.
+			self._warn("could not start the remux proxy (%s); "
+				"falling back to the direct URL", exc)
+			return rtsp_url, "direct RTSP after proxy failure"
 
 	def _failed(self, exc):
 		self._pending = None
@@ -175,3 +215,7 @@ class FullscreenViewer(Screen):
 	def _info(self, message, *args):
 		if self._log is not None:
 			self._log.info(message, *args)
+
+	def _warn(self, message, *args):
+		if self._log is not None:
+			self._log.error(message, *args)
