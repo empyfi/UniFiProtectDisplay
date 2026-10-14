@@ -40,6 +40,19 @@ _autostart_timer = None
 
 # -- entry points ---------------------------------------------------------
 
+def open_main(session, **kwargs):
+	"""The plugin's own menu: every action in one place.
+
+	The plugin browser is in the main menu on every image, whereas the key
+	that opens the extensions menu is not the same on every box. Pointing
+	the plugin-menu entry here rather than straight at setup means there is
+	always a dependable way to actually start the display.
+	"""
+	from .ui.mainmenu import UnifiProtectMain
+	manager = DisplayManager.get(session)
+	session.open(UnifiProtectMain, manager)
+
+
 def open_setup(session, **kwargs):
 	from .ui.setup import UnifiProtectSetup
 	manager = DisplayManager.get(session)
@@ -113,7 +126,7 @@ def Plugins(**kwargs):
 			description="%s (%s)" % (DESCRIPTION, PLUGIN_VERSION),
 			where=PluginDescriptor.WHERE_PLUGINMENU,
 			icon="plugin.png",
-			fnc=open_setup,
+			fnc=open_main,
 			needsRestart=False),
 		PluginDescriptor(
 			name=_("UniFi Protect: corner"),

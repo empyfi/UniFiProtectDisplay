@@ -54,12 +54,35 @@ def redact_url(url):
 	return "%s%s%s/***" % (head, _SCHEME_SEP, authority)
 
 
-class Logger(object):
-	"""Prefixed writer. Inject a fake ``writer`` in tests to assert on output."""
+LOG_PATH = "/tmp/unifiprotectdisplay.log"
 
-	def __init__(self, writer=None, debug=False):
+# Enough to cover a session's worth of diagnosis, small enough that tmpfs on
+# a receiver with little RAM is never a concern. Past this the file starts
+# again rather than growing without bound.
+LOG_MAX_BYTES = 256 * 1024
+
+
+class Logger(object):
+	"""Prefixed writer to the enigma2 log and to a file of our own.
+
+	The file is not redundant. On many images enigma2's stdout goes to
+	``/dev/console``, where ``print`` output is shown on a screen nobody is
+	watching and is never written anywhere -- so the usual advice of "look
+	in the enigma2 log" yields nothing at all. Keeping a small file in tmpfs
+	means a problem on the box can actually be diagnosed afterwards.
+
+	Inject ``writer`` in tests to assert on output, and ``log_path=None`` to
+	switch the file off.
+	"""
+
+	def __init__(self, writer=None, debug=False, log_path=LOG_PATH,
+			max_bytes=LOG_MAX_BYTES, opener=None, size_of=None):
 		self._writer = writer if writer is not None else _print_writer
 		self.debug_enabled = debug
+		self._log_path = log_path
+		self._max_bytes = max_bytes
+		self._opener = opener or _open_append
+		self._size_of = size_of or _size_of
 
 	def info(self, message, *args):
 		self._emit(message, args)
@@ -79,7 +102,47 @@ class Logger(object):
 				# A broken format string must never take down a caller that was
 				# only trying to log something.
 				message = "%s %r" % (message, (args,))
-		self._writer("%s %s" % (PREFIX, message))
+		line = "%s %s" % (PREFIX, message)
+		self._writer(line)
+		self._to_file(line)
+
+	def _to_file(self, line):
+		"""Append one line to our own log. Never raises.
+
+		Logging that can fail a caller is worse than no logging: a read-only
+		or full /tmp must not take down the camera display.
+		"""
+		if not self._log_path:
+			return
+		try:
+			if self._size_of(self._log_path) > self._max_bytes:
+				mode = "w"  # start again rather than grow without bound
+			else:
+				mode = "a"
+			handle = self._opener(self._log_path, mode)
+			try:
+				handle.write("%s %s\n" % (_timestamp(), line))
+			finally:
+				handle.close()
+		except (OSError, IOError, ValueError):
+			pass
+
+
+def _timestamp():
+	import time
+	return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _size_of(path):
+	import os
+	try:
+		return os.path.getsize(path)
+	except (OSError, IOError):
+		return 0
+
+
+def _open_append(path, mode):
+	return open(path, mode)
 
 
 def _print_writer(line):

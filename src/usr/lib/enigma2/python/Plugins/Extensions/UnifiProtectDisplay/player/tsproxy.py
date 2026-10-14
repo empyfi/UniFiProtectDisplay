@@ -53,19 +53,35 @@ CHUNK_SIZE = 188 * 350  # ~64 KiB
 def default_ffmpeg_args(url, ffmpeg="ffmpeg"):
 	"""Command line for remuxing ``url`` to MPEG-TS on stdout.
 
+	Every option here is deliberate, and two of them were learned the hard
+	way on a real receiver:
+
 	``-c copy`` is the point of the whole exercise: repackage, never
-	re-encode. ``-rtsp_transport tcp`` because UDP RTP loses packets on
-	consumer wifi and the artefacts are far worse than the slight extra
-	latency. ``-muxdelay 0`` keeps the corner picture close to live.
+	re-encode, because a set-top box cannot encode H.264 in real time.
+
+	``-rtsp_transport tcp`` because UDP RTP loses packets on consumer wifi,
+	and the artefacts are far worse than the slight extra latency.
+
+	``-map 0:v:0`` takes the video and nothing else. A UniFi camera offers
+	two audio tracks, one of them Opus, which MPEG-TS cannot carry -- left
+	to its own devices ffmpeg may pick it and fail to mux. PiP is started
+	muted anyway (``setTarget(1, True)``), so audio would be carried only to
+	be thrown away.
+
+	No read timeout is set. ``-rw_timeout`` is rejected outright by the
+	RTSP demuxer in the ffmpeg builds shipped on these images -- "Option
+	rw_timeout not found" -- and ffmpeg then exits before reading a single
+	byte, which shows up as a black corner with no other symptom. A
+	stalled camera is handled by stopping the process when the client
+	disconnects instead, which costs nothing and cannot misfire.
 	"""
 	return [
 		ffmpeg,
 		"-hide_banner",
 		"-loglevel", "error",
 		"-rtsp_transport", "tcp",
-		# Give up on a dead camera instead of hanging forever (microseconds).
-		"-rw_timeout", "15000000",
 		"-i", url,
+		"-map", "0:v:0",
 		"-c", "copy",
 		"-f", "mpegts",
 		"-muxdelay", "0",

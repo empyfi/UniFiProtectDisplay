@@ -387,3 +387,57 @@ msgstr "Verbunden. Protect-Version %s"
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:226
 msgid "Connected."
 msgstr "Verbunden."
+
+msgid "Settings"
+msgstr "Einstellungen"
+
+msgid "Corner on/off"
+msgstr "Ecke ein/aus"
+
+msgid "Hide corner"
+msgstr "Ecke ausblenden"
+
+msgid "Show corner"
+msgstr "Ecke einblenden"
+
+msgid "live video"
+msgstr "Live-Video"
+
+msgid "snapshots"
+msgstr "Standbilder"
+
+msgid "Corner is switched off in settings"
+msgstr "Ecke ist in den Einstellungen abgeschaltet"
+
+msgid "Next camera"
+msgstr "Nächste Kamera"
+
+msgid "Cameras..."
+msgstr "Kameras ..."
+
+msgid "Settings..."
+msgstr "Einstellungen ..."
+
+msgid "Not set up yet: no console address or API key."
+msgstr "Noch nicht eingerichtet: keine Konsolenadresse oder kein API-Schlüssel."
+
+msgid "Console %s, %d camera(s) selected."
+msgstr "Konsole %s, %d Kamera(s) ausgewählt."
+
+msgid "Live video cannot run here: %s"
+msgstr "Live-Video ist hier nicht möglich: %s"
+
+msgid "Corner: live video, %s"
+msgstr "Ecke: Live-Video, %s"
+
+msgid "Corner: snapshots every %s s, %s"
+msgstr "Ecke: Standbilder alle %s s, %s"
+
+msgid "Corner: off"
+msgstr "Ecke: aus"
+
+msgid "%s, %s%% wide"
+msgstr "%s, %s%% breit"
+
+msgid "  (offline)"
+msgstr "  (offline)"

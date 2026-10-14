@@ -31,7 +31,7 @@ telling us, a watchdog notices and runs our cleanup.
 corner, so the previous values are saved and put back on stop.
 """
 
-from enigma import eServiceReference, eTimer
+from enigma import ePoint, eServiceReference, eSize, eTimer
 
 from Components.config import config
 from Screens.PictureInPicture import PictureInPicture
@@ -67,7 +67,6 @@ class PipCorner(object):
 			ffmpeg_path=(capabilities.which("ffmpeg") or "ffmpeg")
 			if capabilities else "ffmpeg",
 			port=proxy_port, log=log)
-		self._saved_pip = None
 		self._saved_mode = None
 		self._pending = None
 		self._active = False
@@ -106,12 +105,11 @@ class PipCorner(object):
 			self._error("could not start the TS proxy: %s", exc)
 			return False, _("Could not start the local stream proxy: %s") % exc
 
-		self._save_pip_config()
 		try:
 			self._create_pip()
 		except Exception as exc:  # noqa: BLE001
 			self._error("could not create the PiP window: %s", exc)
-			self._restore_pip_config()
+			self._release_standard_mode()
 			self._proxy.stop()
 			return False, _("Could not open the PiP window: %s") % exc
 
@@ -127,16 +125,18 @@ class PipCorner(object):
 			or getattr(self.session, "pipshown", False))
 
 	def _create_pip(self):
+		# config.av.pip is the user's own Picture-in-Picture geometry. It is
+		# deliberately never written here: PictureInPicture.move() and
+		# .resize() persist straight into it, so using them would replace
+		# whatever position and size the user had set for their own PiP, and
+		# a plugin borrowing the window has no business doing that. The
+		# window is positioned through its widgets instead, which changes
+		# what is on screen and nothing on disk.
+		self._borrow_standard_mode()
 		self.session.pip = self.session.instantiateDialog(PictureInPicture)
 		self.session.pip.setAnimationMode(0)
 		self.session.pip.show()
-		# "standard" is the only mode that honours an arbitrary position;
-		# every other mode overrides x and y with a fixed layout.
-		self.session.pip.setMode("standard")
-		x, y, width, height = geometry.pip_rect(
-			self._corner, self._width_percent, self._margin_percent)
-		self.session.pip.move(x, y)
-		self.session.pip.resize(width, height)
+		self._apply_geometry()
 		# Keep InfoBar's own state truthful, so its PiP button and its
 		# guards behave. Pressing it will close our corner, which is the
 		# behaviour a user would expect from that button anyway.
@@ -147,8 +147,6 @@ class PipCorner(object):
 			self.session.pip.servicePath = None
 		except AttributeError:
 			pass
-		self._info("PiP corner at %d,%d %dx%d (720x576 space)",
-			x, y, width, height)
 
 	# -- playback ---------------------------------------------------------
 
@@ -253,41 +251,63 @@ class PipCorner(object):
 		# Stopping the proxy kills ffmpeg: no camera traffic survives the
 		# corner being switched off.
 		self._proxy.stop()
-		self._restore_pip_config()
+		self._release_standard_mode()
 		self._info("PiP corner stopped")
 
 	# -- the user's PiP geometry ------------------------------------------
 
-	def _save_pip_config(self):
-		"""Snapshot config.av.pip before PictureInPicture overwrites it.
+	def _apply_geometry(self):
+		"""Place the PiP window in the chosen corner, on screen only.
 
-		``move()`` and ``resize()`` write straight into the config and save
-		it, so without this the user's own PiP position would be silently
-		replaced by our corner.
+		Deliberately not ``PictureInPicture.move()`` / ``.resize()``: those
+		write the new position and size into ``config.av.pip`` and save it,
+		which would overwrite the user's own PiP geometry for good. Moving
+		the widgets directly has the same visible effect and leaves the
+		configuration untouched.
 		"""
+		x, y, width, height = geometry.pip_rect(
+			self._corner, self._width_percent, self._margin_percent)
+		pip = self.session.pip
 		try:
-			self._saved_pip = list(config.av.pip.value)
-			self._saved_mode = config.av.pip_mode.value
-		except (AttributeError, TypeError) as exc:
-			# config.av.pip only exists once PictureInPicture has been
-			# constructed at least once; nothing to restore in that case.
-			self._saved_pip = None
-			self._saved_mode = None
-			self._info("no existing PiP configuration to preserve (%s)", exc)
+			pip.instance.move(ePoint(x, y))
+			pip.instance.resize(eSize(width, height))
+			# The video widget inside the window has to follow, or the
+			# picture keeps the old size within a resized frame.
+			pip["video"].instance.resize(eSize(width, height))
+		except (AttributeError, RuntimeError) as exc:
+			self._error("could not place the PiP window: %s", exc)
+			return
+		self._info("PiP corner at %d,%d %dx%d (in PiP's 720x576 space)",
+			x, y, width, height)
 
-	def _restore_pip_config(self):
-		if self._saved_pip is None:
+	def _borrow_standard_mode(self):
+		"""Switch PiP to "standard" placement in memory only.
+
+		Every other mode forces its own fixed layout, and the cascade and
+		split modes also shrink the main picture. The value is changed
+		without ``save()``, so ``saved_value`` -- what actually reaches
+		/etc/enigma2/settings -- still holds the user's choice, and
+		:meth:`_release_standard_mode` puts the live value back.
+		"""
+		self._saved_mode = None
+		try:
+			if config.av.pip_mode.value != "standard":
+				self._saved_mode = config.av.pip_mode.value
+				config.av.pip_mode.value = "standard"
+		except AttributeError:
+			# config.av.pip_mode is created by PictureInPicture itself and
+			# may not exist on the very first use; the default is
+			# "standard", which is what we want anyway.
+			pass
+
+	def _release_standard_mode(self):
+		if self._saved_mode is None:
 			return
 		try:
-			config.av.pip.value = self._saved_pip
-			config.av.pip.save()
-			if self._saved_mode is not None:
-				config.av.pip_mode.value = self._saved_mode
-				config.av.pip_mode.save()
-		except (AttributeError, TypeError) as exc:
-			self._error("could not restore the PiP configuration: %s", exc)
+			config.av.pip_mode.value = self._saved_mode
+		except AttributeError:
+			pass
 		finally:
-			self._saved_pip = None
 			self._saved_mode = None
 
 	# -- logging ----------------------------------------------------------

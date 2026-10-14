@@ -82,7 +82,12 @@ class UnifiProtectCameraList(Screen):
 		rows = []
 		self._ids = []
 		for camera_id, name, enabled in self._store.all():
-			rows.append("%s  %s" % (MARK_ON if enabled else MARK_OFF, name))
+			# A camera that is offline in Protect shows nothing but black on
+			# the television, which is indistinguishable from a bug. Say so
+			# here instead of letting the user hunt for it.
+			suffix = "" if self._store.is_connected(camera_id) else _("  (offline)")
+			rows.append("%s  %s%s" % (
+				MARK_ON if enabled else MARK_OFF, name, suffix))
 			self._ids.append(camera_id)
 		self["list"].setList(rows)
 		if rows:

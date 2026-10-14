@@ -309,10 +309,13 @@ def restart_enigma(client, wait):
 
 def show_log(client):
 	log("\n== what the plugin logged ==")
+	# The plugin's own file first: on many images enigma2's stdout goes to
+	# /dev/console, so prints never reach a log at all.
 	status, out, _ = run(
 		client,
-		"grep -h UnifiProtectDisplay /home/root/logs/* /tmp/*.log 2>/dev/null "
-		"| tail -25", check=False, quiet=True)
+		"tail -40 /tmp/unifiprotectdisplay.log 2>/dev/null; "
+		"grep -h UnifiProtectDisplay /home/root/logs/* 2>/dev/null | tail -15",
+		check=False, quiet=True)
 	text = out.strip()
 	if text:
 		for line in text.split("\n"):

@@ -74,6 +74,19 @@ class CameraStore(object):
 		"""Every known camera, in display order, as ``(id, name, enabled)``."""
 		return [(e["id"], e["name"], e["enabled"]) for e in self._entries]
 
+	def is_connected(self, camera_id):
+		"""Whether the console last reported this camera as reachable.
+
+		Cached from the last refresh rather than asked live: the camera list
+		has to render instantly, and a camera that went offline a minute ago
+		is still worth showing -- marked, so the user knows why it is
+		black.
+		"""
+		for entry in self._entries:
+			if entry["id"] == camera_id:
+				return entry.get("connected", True)
+		return True
+
 	def enabled_ids(self):
 		"""Ids the user selected, in order. This is what rotation iterates."""
 		return [e["id"] for e in self._entries if e["enabled"]]
@@ -134,10 +147,12 @@ class CameraStore(object):
 					"id": camera.id,
 					"name": camera.name or camera.id,
 					"enabled": False,
+					"connected": bool(camera.connected),
 				})
 				added += 1
 			else:
 				entry["name"] = camera.name or entry["name"]
+				entry["connected"] = bool(camera.connected)
 				merged.append(entry)
 		removed = len([e for e in self._entries if e["id"] not in incoming_ids])
 		self._entries = merged
@@ -172,6 +187,9 @@ def _normalise(item):
 		"id": str(camera_id),
 		"name": str(item.get("name") or camera_id),
 		"enabled": bool(item.get("enabled", False)),
+		# Absent in files written by older versions; assume reachable so a
+		# camera is never marked offline because of a missing field.
+		"connected": bool(item.get("connected", True)),
 	}
 
 

@@ -87,10 +87,24 @@ class TestFfmpegCommand:
 		args = default_ffmpeg_args(RTSP_URL)
 		assert args[args.index("-rtsp_transport") + 1] == "tcp"
 
-	def test_has_a_read_timeout(self):
-		# Without one, a camera that stops answering leaves ffmpeg running
-		# for ever and the corner black.
-		assert "-rw_timeout" in default_ffmpeg_args(RTSP_URL)
+	def test_sets_no_rw_timeout(self):
+		# The RTSP demuxer in the ffmpeg builds on these images rejects
+		# -rw_timeout outright ("Option rw_timeout not found") and exits
+		# before reading a byte, which looks exactly like a camera fault.
+		# Verified on a GigaBlue UHD Quad 4K Pro, openATV 7.6.
+		assert "-rw_timeout" not in default_ffmpeg_args(RTSP_URL)
+
+	def test_takes_the_video_stream_only(self):
+		# A UniFi camera offers two audio tracks, one of them Opus, which
+		# MPEG-TS cannot carry; ffmpeg may pick it and fail to mux. PiP is
+		# muted anyway, so audio would be carried only to be discarded.
+		args = default_ffmpeg_args(RTSP_URL)
+		assert args[args.index("-map") + 1] == "0:v:0"
+
+	def test_map_comes_after_the_input(self):
+		# -map is an output option; before -i ffmpeg rejects it.
+		args = default_ffmpeg_args(RTSP_URL)
+		assert args.index("-map") > args.index("-i")
 
 	def test_url_is_passed_as_the_input(self):
 		args = default_ffmpeg_args(RTSP_URL)

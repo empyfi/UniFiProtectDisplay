@@ -167,3 +167,32 @@ class TestOrdering:
 	def test_move_unknown_camera(self):
 		store, _ = store_with([{"id": "a"}])
 		assert store.move("zzz", 1) is False
+
+
+class TestConnectionState:
+	def test_merge_records_the_connection_state(self):
+		store, _ = store_with([])
+		store.merge([Camera("1", "Hof", connected=False)])
+		assert store.is_connected("1") is False
+
+	def test_refresh_updates_a_camera_that_came_back(self):
+		store, _ = store_with([{"id": "1", "connected": False}])
+		store.merge([Camera("1", "Hof", connected=True)])
+		assert store.is_connected("1") is True
+
+	def test_state_survives_saving_and_loading(self):
+		store, backing = store_with([])
+		store.merge([Camera("1", "Hof", connected=False)])
+		store.save()
+		reloaded = CameraStore(reader=backing.read, writer=backing.write).load()
+		assert reloaded.is_connected("1") is False
+
+	def test_files_from_older_versions_assume_reachable(self):
+		# No "connected" key: never mark a camera offline because of a
+		# field that simply was not written yet.
+		store, _ = store_with([{"id": "1", "name": "Hof", "enabled": True}])
+		assert store.is_connected("1") is True
+
+	def test_unknown_camera_is_assumed_reachable(self):
+		store, _ = store_with([])
+		assert store.is_connected("zzz") is True
