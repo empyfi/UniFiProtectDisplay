@@ -534,3 +534,30 @@ msgstr "Kamera zeigen, Ecke bei Bedarf einschalten"
 
 msgid "Only switch over while the corner is already on"
 msgstr "Nur umschalten, solange die Ecke schon läuft"
+
+msgid "offline"
+msgstr "offline"
+
+msgid "Motion webhook addresses"
+msgstr "Webhook-Adressen für Bewegung"
+
+msgid "Motion webhook addresses..."
+msgstr "Webhook-Adressen für Bewegung ..."
+
+msgid "Addresses to paste into Protect: press Blue"
+msgstr "Adressen zum Eintragen in Protect: Blau drücken"
+
+msgid "New token"
+msgstr "Neuer Token"
+
+msgid "The token keeps a stray request from switching the television. Pressing Green issues a new one, which makes every address already pasted into Protect stop working."
+msgstr "Der Token verhindert, dass ein versehentlicher Aufruf den Fernseher umschaltet. Grün erzeugt einen neuen - damit hören alle bereits in Protect eingetragenen Adressen auf zu funktionieren."
+
+msgid "No cameras selected, or no token yet."
+msgstr "Keine Kameras ausgewählt, oder noch kein Token vorhanden."
+
+msgid "In UniFi Protect: Alarm Manager > New Alarm, one per camera.\nTrigger Motion, scope that camera, action Webhook > Custom Webhook, method GET,\nand paste the matching address below."
+msgstr "In UniFi Protect: Alarm Manager > Neuer Alarm, einer pro Kamera.\nAuslöser Motion, Bereich diese Kamera, Aktion Webhook > Custom Webhook, Methode GET,\nund die passende Adresse unten eintragen."
+
+msgid "Motion reporting is switched off. Turn on \"React to motion reported by Protect\" in settings first."
+msgstr "Bewegungsmeldung ist abgeschaltet. Schalte in den Einstellungen zuerst „Auf Bewegung von Protect reagieren“ ein."

@@ -108,8 +108,8 @@ class TestIndexSafety:
 
 
 class TestSkippingUnusableCameras:
-	"""An offline camera decodes to nothing, so landing on it is
-	indistinguishable from the button not having worked."""
+	"""Skipping is available but off by default: an offline camera now keeps
+	its place and is labelled instead, so the user can see it is down."""
 
 	@staticmethod
 	def rot(ids, offline=()):

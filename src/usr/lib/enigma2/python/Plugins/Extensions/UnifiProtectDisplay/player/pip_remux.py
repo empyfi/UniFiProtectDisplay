@@ -38,6 +38,18 @@ from Screens.PictureInPicture import PictureInPicture
 
 from .. import geometry, servicerefs
 from .tsproxy import TsProxy
+
+
+def _desktop_size(session):
+	"""Skin resolution, with a safe fallback."""
+	try:
+		from enigma import getDesktop
+		size = getDesktop(0).size()
+		if size.width() > 0 and size.height() > 0:
+			return size.width(), size.height()
+	except Exception:  # noqa: BLE001
+		pass
+	return 1280, 720
 from ..localisation import _, blocker_text
 
 # How often to check that enigma2 has not closed our PiP behind our back.
@@ -78,6 +90,7 @@ class PipCorner(object):
 		self._saved_mode = None
 		self._pending = None
 		self._active = False
+		self._offline = None
 		self._rotate_timer = None
 		self._watchdog = None
 
@@ -164,6 +177,13 @@ class PipCorner(object):
 			return
 		if self._on_camera_shown is not None:
 			self._on_camera_shown()
+		if not self._controller.store.is_connected(camera_id):
+			# No point asking Protect for a stream it cannot serve, and no
+			# point leaving the last camera's frame on screen pretending to
+			# be this one.
+			self._show_offline(camera_id)
+			return
+		self._hide_offline()
 		if self._pending is not None:
 			self._pending.cancel()
 		name = self._controller.store.name_for(camera_id)
@@ -192,6 +212,50 @@ class PipCorner(object):
 				"PiP refused the service. The box reported no free decoder, "
 				"or it cannot decode this stream. Try a lower camera "
 				"quality (H.264 rather than H.265).")
+
+	def _show_offline(self, camera_id):
+		"""Cover the corner with a black panel naming the camera."""
+		if self._pending is not None:
+			self._pending.cancel()
+			self._pending = None
+		# Stop whatever is still decoding, or the previous camera's last
+		# frame stays visible behind the panel.
+		try:
+			self.session.pip.playService(None)
+		except Exception:  # noqa: BLE001
+			pass
+		name = self._controller.store.name_for(camera_id)
+		from .. import geometry
+		rect = geometry.to_skin_space(
+			self._current_rect(), *_desktop_size(self.session))
+		if self._offline is None:
+			from ..render.offline_overlay import OfflineOverlay
+			try:
+				self._offline = self.session.instantiateDialog(
+					OfflineOverlay, rect, name)
+				self._offline.show()
+			except Exception as exc:  # noqa: BLE001
+				self._error("could not show the offline panel: %s", exc)
+				self._offline = None
+				return
+		else:
+			self._offline.set_camera(name)
+			self._offline.show()
+		self._info("camera %s is offline", camera_id)
+
+	def _hide_offline(self):
+		if self._offline is not None:
+			try:
+				self.session.deleteDialog(self._offline)
+			except Exception as exc:  # noqa: BLE001
+				self._error("while closing the offline panel: %s", exc)
+			self._offline = None
+
+	def _current_rect(self):
+		if self._follow_pip:
+			return geometry.pip_config_rect(self._current_pip_values())
+		return geometry.pip_rect(
+			self._corner, self._width_percent, self._margin_percent)
 
 	def _failed(self, exc):
 		self._pending = None
@@ -250,6 +314,7 @@ class PipCorner(object):
 		if self._pending is not None:
 			self._pending.cancel()
 			self._pending = None
+		self._hide_offline()
 
 		if not pip_already_gone and hasattr(self.session, "pip"):
 			try:

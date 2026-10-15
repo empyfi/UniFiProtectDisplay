@@ -150,6 +150,11 @@ class SnapshotOverlay(Screen):
 		if camera_id is None:
 			self._show_message(_("No camera selected"))
 			return
+		if not self._controller.store.is_connected(camera_id):
+			# Asking the console for a snapshot it cannot take wastes a
+			# request per tick and leaves the last camera's picture up.
+			self._show_offline(camera_id)
+			return
 		if self._pending is not None:
 			# The previous fetch has not come back. Skipping rather than
 			# queueing keeps a slow console from building a backlog that
@@ -231,6 +236,17 @@ class SnapshotOverlay(Screen):
 		if camera_id is None:
 			return
 		self["label"].setText(self._controller.store.name_for(camera_id))
+
+	def _show_offline(self, camera_id):
+		"""Blank the picture and label the camera as unreachable."""
+		pixmap = self["picture"].instance
+		if pixmap is not None:
+			try:
+				pixmap.setPixmap(None)
+			except Exception:  # noqa: BLE001
+				pass
+		self._show_message("%s - %s" % (
+			self._controller.store.name_for(camera_id), _("offline")))
 
 	def _show_message(self, text):
 		self._showing_error = True

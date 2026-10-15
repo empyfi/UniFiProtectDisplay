@@ -129,6 +129,13 @@ class FullscreenViewer(Screen):
 			return
 		if self._on_camera_shown is not None:
 			self._on_camera_shown()
+		if not self._controller.store.is_connected(camera_id):
+			# Stop whatever was playing: a frozen frame from the previous
+			# camera under the word "offline" would be worse than black.
+			self.session.nav.stopService()
+			self["caption"].setText(self._controller.store.name_for(camera_id))
+			self["status"].setText(_("offline"))
+			return
 		name = self._controller.store.name_for(camera_id)
 		self["caption"].setText(name)
 		self["status"].setText(_("Connecting..."))

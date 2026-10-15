@@ -76,7 +76,7 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 				"red": self.keyCancel,
 				"green": self.keySave,
 				"yellow": self._test_connection,
-				"blue": self._open_cameras,
+				"blue": self._blue,
 			}, -2)
 
 	# -- the list ---------------------------------------------------------
@@ -167,6 +167,8 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 					"motion by itself.")),
 		])
 		if cfg.webhook.value:
+			entries.append(_divider(
+				_("Addresses to paste into Protect: press Blue")))
 			entries.extend([
 				(_("Listening port"), cfg.webhook_port,
 					_("The port Protect should call. Must be reachable from "
@@ -274,6 +276,30 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 
 	def _status(self, text):
 		self["status"].setText(text)
+
+	def _blue(self):
+		"""Blue opens whatever the current section is about."""
+		if self._config.webhook.value and self._in_motion_section():
+			self._open_webhook_info()
+			return
+		self._open_cameras()
+
+	def _in_motion_section(self):
+		"""True when the cursor is on one of the motion settings."""
+		current = self["config"].getCurrent()
+		element = current[1] if current and len(current) > 1 else None
+		return element in (
+			self._config.webhook, self._config.webhook_port,
+			self._config.motion_action, self._config.motion_hold)
+
+	def _open_webhook_info(self):
+		from .webhookinfo import UnifiProtectWebhookInfo
+		self._apply()
+		self.session.openWithCallback(
+			self._returned, UnifiProtectWebhookInfo, self._manager)
+
+	def _returned(self, *args):
+		self._build_list()
 
 	def _open_cameras(self):
 		from .cameras import UnifiProtectCameraList

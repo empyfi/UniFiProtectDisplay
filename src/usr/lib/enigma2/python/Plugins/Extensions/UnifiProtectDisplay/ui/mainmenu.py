@@ -31,6 +31,7 @@ ACTION_FULLSCREEN = "fullscreen"
 ACTION_NEXT = "next"
 ACTION_CAMERAS = "cameras"
 ACTION_SETUP = "setup"
+ACTION_WEBHOOK = "webhook"
 ACTION_WINDOW = "window"
 
 
@@ -119,6 +120,10 @@ class UnifiProtectMain(Screen):
 		rows.append(_("Cameras..."))
 		self._actions.append(ACTION_CAMERAS)
 
+		if get_config().webhook.value:
+			rows.append(_("Motion webhook addresses..."))
+			self._actions.append(ACTION_WEBHOOK)
+
 		rows.append(_("Settings..."))
 		self._actions.append(ACTION_SETUP)
 
@@ -184,6 +189,10 @@ class UnifiProtectMain(Screen):
 			self._open_cameras()
 		elif action == ACTION_WINDOW:
 			self._edit_window()
+		elif action == ACTION_WEBHOOK:
+			from .webhookinfo import UnifiProtectWebhookInfo
+			self.session.openWithCallback(
+				self._returned, UnifiProtectWebhookInfo, self._manager)
 		elif action == ACTION_SETUP:
 			self._open_setup()
 
