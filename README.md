@@ -1,8 +1,9 @@
 # UniFi Protect Display
 
-An Enigma2 plugin that puts UniFi Protect cameras on your receiver: in a
-corner of the screen over live television, or full screen, one camera or
-several in rotation.
+An Enigma2 plugin that puts UniFi Protect cameras on your receiver. Mainly
+in the channel list, as ordinary channels anyone can reach with the remote
+they already use; also in a corner of the screen over live television, or
+full screen, one camera or several in rotation.
 
 Cameras are found through the Protect Integration API, which also switches on
 each camera's RTSP stream — no stream URLs have to be enabled per camera in
@@ -83,7 +84,7 @@ and is preferred automatically when present.
 Download the `.ipk` from the releases page and:
 
 ```bash
-opkg install enigma2-plugin-extensions-unifi-protect-display_0.1.0_all.ipk
+opkg install enigma2-plugin-extensions-unifi-protect-display_*_all.ipk
 ```
 
 Then restart enigma2. Setup lives under **Menu → Plugins → UniFi Protect
@@ -215,6 +216,13 @@ strong secret, and regenerating it invalidates URLs already pasted.
 - **TLS verification is off by default.** With it on, every request to a
   stock console fails, because the certificate is self-signed.
 - The plugin never logs the API key or a stream URL's token.
+- **The bouquet holds tokens that survive a restart.** A reference in a
+  channel list has to work tomorrow, so the entries point at fixed
+  loopback URLs with tokens kept in the plugin's camera file — unlike the
+  corner, which invents one per session. They are not a secret worth
+  much: the proxy binds to `127.0.0.1` only, so the URL is useless to
+  anyone who is not already on the receiver. A Protect stream token never
+  appears in a bouquet file.
 
 ## Development
 
@@ -232,7 +240,12 @@ pip install paramiko
 python tools/deploy.py 192.168.1.50            # probe, build, install, restart
 python tools/deploy.py 192.168.1.50 --probe-only   # change nothing
 python tools/deploy.py 192.168.1.50 --log-only     # just read the plugin's log
+python tools/deploy.py 192.168.1.50 --rebuild      # force a rebuild
 ```
+
+It rebuilds on its own when anything under `src`, `po`, `CONTROL` or
+`build.py` is newer than the last `.ipk`, so `--rebuild` is only for
+forcing the issue.
 
 It authenticates with an SSH key, the agent, `E2_PASSWORD`, or a prompt, in
 that order. A key is worth the one-time setup — it survives a password change
@@ -243,9 +256,11 @@ ssh-copy-id -i ~/.ssh/id_ed25519_box.pub root@192.168.1.50
 ```
 
 Everything that can be tested off the box is kept free of `enigma` imports —
-API client, service-reference escaping, geometry, rotation, capability
-probing, the camera store and the orchestration layer. Enigma2 is confined to
-the screens. See [docs/architecture.md](docs/architecture.md).
+the API client, service-reference escaping, geometry, rotation, capability
+probing, the camera store, the bouquet file, the cards that are drawn as
+video, and both kinds of rotating channel. Enigma2 is confined to the
+screens, and to the two things only it can do: say what is playing and
+change it. See [docs/architecture.md](docs/architecture.md).
 
 ## Licence
 

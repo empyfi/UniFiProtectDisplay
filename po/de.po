@@ -272,10 +272,6 @@ msgstr "Abstand zum Bildschirmrand in Prozent."
 msgid "Refresh every"
 msgstr "Aktualisieren alle"
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:114
-msgid "Seconds between snapshots. Lower is smoother but asks more of the console."
-msgstr "Sekunden zwischen den Standbildern. Kleinere Werte wirken flüssiger, belasten die Konsole aber stärker."
-
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:116
 msgid "Request high quality snapshots"
 msgstr "Standbilder in hoher Qualität anfordern"
@@ -327,10 +323,6 @@ msgstr "Automatisch durch die ausgewählten Kameras wechseln."
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:140
 msgid "Change camera every"
 msgstr "Kamera wechseln alle"
-
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:141
-msgid "Seconds each camera stays on screen."
-msgstr "Sekunden, die jede Kamera zu sehen ist."
 
 #: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/ui/setup.py:144
 msgid "Other"
@@ -618,3 +610,9 @@ msgstr "Ein weiterer Kanal, der eine Kamera nach der anderen als Standbild zeigt
 
 msgid "Rotation (stills)"
 msgstr "Rotation (Bilder)"
+
+msgid "Seconds between snapshots, in the corner and on the rotating stills channel. Lower is smoother but asks more of the console."
+msgstr "Sekunden zwischen den Schnappschüssen, in der Ecke und auf dem Kanal mit rotierenden Standbildern. Kleiner ist flüssiger, fordert die Konsole aber mehr."
+
+msgid "Seconds each camera stays on screen, in the corner and on the rotating channels."
+msgstr "Sekunden, die jede Kamera auf dem Bildschirm bleibt, in der Ecke und auf den rotierenden Kanälen."

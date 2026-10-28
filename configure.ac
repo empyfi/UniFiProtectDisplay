@@ -1,4 +1,4 @@
-AC_INIT([enigma2-plugin-extensions-unifi-protect-display], [0.1.0], [https://github.com/empyfi/UniFiProtectDisplay])
+AC_INIT([enigma2-plugin-extensions-unifi-protect-display], [0.8.0], [https://github.com/empyfi/UniFiProtectDisplay])
 AM_INIT_AUTOMAKE([foreign no-define subdir-objects])
 AC_CONFIG_MACRO_DIRS([m4])
 

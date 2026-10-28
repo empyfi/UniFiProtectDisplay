@@ -56,10 +56,21 @@ Protect.
 ## 3. Install the plugin
 
 ```bash
-opkg install enigma2-plugin-extensions-unifi-protect-display_0.1.0_all.ipk
+opkg install enigma2-plugin-extensions-unifi-protect-display_*_all.ipk
 ```
 
 Restart enigma2 afterwards, so the plugin is registered.
+
+From a machine with SSH access to the box, `tools/deploy.py` does the probe,
+the build, the install and the restart in one go, and `tools/configure.py`
+sets everything up without typing an API key on a remote control:
+
+```bash
+pip install paramiko
+python tools/deploy.py <box-ip>
+python tools/configure.py <box-ip> --console <protect-ip> --api-key <key> \
+    --all-cameras --bouquet --bouquet-rotate
+```
 
 ## 4. Set it up
 
@@ -74,13 +85,62 @@ Restart enigma2 afterwards, so the plugin is registered.
 5. Press **Blue** (*Cameras*), then **Green** to fetch the list. Press **OK**
    on each camera you want. New cameras start switched off deliberately.
    **Yellow** and **Blue** reorder them, and that order is the rotation order.
-6. Back in setup, choose a **Corner mode**:
-   - *Snapshots* — works everywhere, about one picture per second
+6. Switch on **Put the cameras in the channel list**. This is the part
+   everybody else in the house will use; the rest is for whoever set the
+   box up. See step 5 below.
+7. Back in setup, choose a **Corner mode**:
+   - *Snapshots* — works everywhere, a picture every second or two
    - *Live video* — real motion, needs the second decoder and ffmpeg; if
      unavailable, the screen says which part is missing
-7. Save with **Green**.
+8. Save with **Green**.
 
-## 5. Day-to-day use
+## 5. The channel list
+
+With *Put the cameras in the channel list* switched on, write the bouquet
+from the plugin's own menu (**Menu → Plugins → UniFi Protect Display**). A
+bouquet called **UniFi Protect** appears at the end of the channel list,
+holding up to four kinds of entry:
+
+| Entry | What it plays |
+|---|---|
+| **Cam 1**, **Cam 2**, … | one camera each, live video, numbered because Protect lets two cameras share a name |
+| **All cameras** | every selected camera at once as stills, laid out to fill the frame |
+| **Rotation** | the cameras in turn, live video, by changing channel on a timer |
+| **Rotation (stills)** | the cameras in turn as stills; the camera changes instantly |
+
+The last three are optional and each has its own setting. The two rotating
+entries are the same idea traded off differently: **Rotation** gives the
+camera's own video but every change is a service restart, so each camera
+arrives after however long its stream takes to open; **Rotation (stills)**
+changes camera instantly and shows roughly one picture a second, about a
+second behind the world. Changing channel is how you leave either one.
+
+A camera the console cannot reach plays a black card naming it and saying
+**OFFLINE**, rather than a channel that simply fails. So does a console that
+cannot be reached at all. That matters most for whoever did not set this up
+and has no other way to tell an unplugged camera from a broken plugin.
+
+Two settings shape the rotating entries, both in setup: **Change camera
+every** is how long each camera gets, and **Refresh every** is how often the
+picture is renewed on the stills entry. Each appears once the entry that
+uses it is switched on.
+
+## 6. Motion
+
+Protect's API cannot report motion, so the direction is reversed: Protect's
+Alarm Manager calls the receiver. Switch on *React to motion reported by
+Protect*, then print the addresses to paste into Protect:
+
+```bash
+python tools/configure.py <box-ip> --webhook-urls
+```
+
+In Protect: **Alarm Manager → New Alarm**, one per camera — trigger
+**Motion**, scope that camera, action **Webhook → Custom Webhook**, method
+GET, and paste the matching URL. The camera is then brought up when it sees
+movement, and held there briefly so rotation does not slide away.
+
+## 7. Day-to-day use
 
 From the extensions menu (usually the blue button on the remote):
 
@@ -101,16 +161,19 @@ The key is wrong, was revoked, or the console is older than Protect 5.3.
 Create a new key under Control Plane → Integrations.
 
 **"The UniFi console did not answer."**
-Wrong address, or the receiver cannot reach the console. Check from the box:
+Wrong address, or the receiver cannot reach the console. Check from the box
+— these images have no `curl`, so use Python:
 
 ```bash
-curl -k -H "X-API-KEY: YOUR_KEY" https://CONSOLE/proxy/protect/integration/v1/meta/info
+python3 -c "import ssl,urllib.request as u; c=ssl._create_unverified_context(); \
+r=u.Request('https://CONSOLE/proxy/protect/integration/v1/meta/info', \
+headers={'X-API-KEY':'YOUR_KEY'}); print(u.urlopen(r,context=c,timeout=10).read())"
 ```
 
 **Snapshot corner shows nothing.**
-Check the enigma2 log for `[UnifiProtectDisplay]`. If snapshots arrive but
-nothing is drawn, the JPEG may not be reaching tmpfs — check free space in
-`/tmp`.
+Check the plugin's own log, `/tmp/unifiprotectdisplay.log`. If snapshots
+arrive but nothing is drawn, the JPEG may not be reaching tmpfs — check free
+space in `/tmp`.
 
 **Fullscreen plays nothing, but the URL works in VLC.**
 Almost always a missing GStreamer RTSP plugin. Install
@@ -139,13 +202,30 @@ If it is not, the proxy never got a connection, which points at the service
 reference rather than at ffmpeg. Turn on **Write debug messages to the log**
 in setup and look for `[UnifiProtectDisplay]` lines.
 
+**A channel in the bouquet plays nothing.**
+Look in `/tmp/unifiprotectdisplay.log`. A camera the console reports as down
+should log `is offline; serving a card` within a second or so; if instead
+nothing is logged, the proxy never got the connection, which points at the
+bouquet file rather than at the plugin. Check that the port in
+`/etc/enigma2/userbouquet.unifiprotect.tv` matches the one the log says the
+proxy is listening on, and rewrite the bouquet from the plugin menu if not.
+
 **Collecting a useful log.**
 
+The plugin keeps its own, capped, in tmpfs. It has to: enigma2's stdout goes
+to `/dev/console` on these images, so `print` output reaches no file at all.
+
 ```bash
-init 4; sleep 2; init 3   # restart enigma2
-tail -f /home/root/logs/* | grep -i unifiprotect
+tail -f /tmp/unifiprotectdisplay.log
 ```
 
-The plugin never writes the API key or a stream token to the log, so its lines
-are safe to post in a forum. Enigma2's own lines are not necessarily — check
-before pasting.
+or from a machine with SSH access, which also survives the restart:
+
+```bash
+python tools/deploy.py <box-ip> --log-only
+```
+
+Switch on *Write debug messages to the log* in setup for more. The plugin
+never writes the API key or a stream token to the log, so its lines are safe
+to post in a forum. Enigma2's own lines are not necessarily — check before
+pasting.

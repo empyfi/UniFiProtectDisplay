@@ -37,7 +37,10 @@ connection" button. Returns the Protect version:
 ### `GET /v1/cameras`
 
 Every camera the key can see. The plugin reads `id` and `name`, and treats
-`isConnected` or `state` as the online flag when present. Protect adds fields
+`isConnected` or `state` as the online flag when present. This is also the
+call the channel list makes to decide whether to serve a camera or an
+OFFLINE card, at most once every thirty seconds, because one request answers
+for every camera at once. Protect adds fields
 between releases, so parsing is lenient: unknown keys are ignored, and an
 entry without an `id` is dropped rather than failing the whole list.
 
@@ -80,9 +83,13 @@ Raw JPEG bytes. `highQuality=true` asks for 1080p or better. The snapshot
 overlay leaves it off: the picture is scaled into a corner anyway, and a
 larger image costs both console time and decode time on the receiver.
 
-There are reports of this endpoint returning HTTP 503 under load, which the
-client maps to `ProtectUnavailableError` — a retryable condition rather than a
-configuration problem.
+This endpoint returns HTTP 503 when the console cannot reach the camera --
+observed against a console with two cameras in `DISCONNECTED` state, both
+answering 503 in about 40 ms. It is also reported under load. Either way the
+client maps it to `ProtectUnavailableError`, a retryable condition rather
+than a configuration problem; the channel list turns it into an OFFLINE card
+rather than a retry, having already asked `/v1/cameras` whether the camera is
+up.
 
 ## Stream URLs
 
@@ -94,9 +101,16 @@ rtsps://<console>:7441/<token>?enableSrtp
 
 The token *is* the credential: anyone holding it can watch that camera. The
 plugin never writes one to the log — `logger.redact_url()` exists for exactly
-this — and the remux proxy hands enigma2 a random per-session token instead,
-so a URL that ends up in a bouquet file or a forum post stops working at the
-next restart.
+this — and never puts one in a bouquet file either. What enigma2 is handed is
+a loopback URL carrying a token of the proxy's own.
+
+Those proxy tokens come in two kinds. The corner's are invented per session,
+so one that leaks into a log or a forum post stops working at the next
+restart. The bouquet's are kept in the plugin's camera file and survive a
+restart, because a reference sitting in a channel list has to work tomorrow.
+That is acceptable only because the proxy binds to `127.0.0.1`: the URL is
+useless to anyone who is not already on the receiver, and it names no camera
+and no Protect token.
 
 ### The plain-RTSP fallback
 

@@ -121,16 +121,19 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 					(_("Margin"), cfg.corner_margin,
 						_("Distance from the screen edge, as a percentage.")),
 				])
+		# Also used by the rotating stills channel, which has nothing to do
+		# with the corner -- so it cannot be hidden behind the corner's mode.
+		if cfg.corner_mode.value == MODE_SNAPSHOT or cfg.bouquet_slides.value:
+			entries.append((_("Refresh every"), cfg.snapshot_interval,
+				_("Seconds between snapshots, in the corner and on the "
+					"rotating stills channel. Lower is smoother but asks "
+					"more of the console.")))
 		if cfg.corner_mode.value == MODE_SNAPSHOT:
-			entries.extend([
-				(_("Refresh every"), cfg.snapshot_interval,
-					_("Seconds between snapshots. Lower is smoother but asks "
-						"more of the console.")),
+			entries.append(
 				(_("Request high quality snapshots"), cfg.snapshot_high_quality,
 					_("Off is usually right: the picture is scaled into a "
 						"corner anyway, and a larger image costs console and "
-						"decoding time.")),
-			])
+						"decoding time.")))
 
 		entries.extend([
 			_divider(_("Cameras and playback")),
@@ -153,9 +156,13 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 			(_("Rotate through cameras"), cfg.rotate,
 				_("Cycle through the selected cameras automatically.")),
 		])
-		if cfg.rotate.value:
+		# The same interval drives both rotating channels in the bouquet,
+		# so switching one of those on has to be enough to reveal it.
+		if (cfg.rotate.value or cfg.bouquet_rotate.value
+				or cfg.bouquet_slides.value):
 			entries.append((_("Change camera every"), cfg.rotate_interval,
-				_("Seconds each camera stays on screen.")))
+				_("Seconds each camera stays on screen, in the corner and "
+					"on the rotating channels.")))
 
 		entries.extend([
 			_divider(_("Motion")),

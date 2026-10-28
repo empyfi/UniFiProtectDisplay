@@ -26,7 +26,28 @@ and the project uses [semantic versioning](https://semver.org/).
 
   Switched on in setup, or with `tools/configure.py --bouquet-slides`.
 
+### Changed
+- The documentation caught up with the last three releases. `docs/`
+  described the plugin as it was before the channel list existed: the
+  architecture had no note for the bouquet, the cards or either kind of
+  rotation, and both it and `docs/api.md` still said a URL in a bouquet
+  file stops working at the next restart, which stopped being true when
+  the bouquet started keeping its tokens. `docs/install.md` never
+  mentioned the channel list or motion at all, and sent people to log
+  files the plugin no longer writes to.
+- `configure.ac` had been left at 0.1.0 since the first release. Nothing
+  noticed, because `build.py` rewrites `CONTROL/control` for the `.ipk`
+  and never looks at `configure.ac` -- but the OpenEmbedded path does,
+  and would have built a package claiming to be 0.1.0. A test now fails
+  when the versions disagree.
+
 ### Fixed
+- Two settings the channel list depends on were reachable only through the
+  corner. *Change camera every* decides how long each camera gets on both
+  rotating channels but appeared only when the corner's own rotation was
+  on, and *Refresh every* decides how often the stills channel renews its
+  picture but appeared only in snapshot corner mode. Somebody using
+  nothing but the channel list could not see either one.
 - Slides name the camera the way the channel list does, numbered.
   Protect lets two cameras share a name and both on the console this was
   built against are called "G3 Flex", so the bare name told nobody which

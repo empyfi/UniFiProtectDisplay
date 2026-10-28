@@ -13,6 +13,7 @@ import gzip
 import importlib.util
 import io
 import os
+import re
 import struct
 import tarfile
 
@@ -118,6 +119,43 @@ class TestRealCatalogue:
 		catalogue = gettext.GNUTranslations(
 			io.BytesIO(build.compile_mo(entries)))
 		assert catalogue.gettext("Cameras") == "Kameras"
+
+
+class TestVersionAgreement:
+	"""The version is written down twice, and the second copy was wrong.
+
+	``build.py`` rewrites ``CONTROL/control`` from ``version.py``, so that
+	one cannot drift. ``configure.ac`` is not rewritten by anything --
+	autoconf wants a literal -- and it sat at 0.1.0 while the plugin was
+	at 0.8.0. Nothing noticed, because the .ipk path never reads it and
+	the OpenEmbedded path is not what this is built with day to day.
+	"""
+
+	@staticmethod
+	def read(name):
+		with io.open(os.path.join(HERE, os.pardir, name),
+				encoding="utf-8") as handle:
+			return handle.read()
+
+	def test_configure_ac_matches_the_plugin_version(self):
+		found = re.search(r"AC_INIT\(\[[^\]]+\],\s*\[([^\]]+)\]",
+			self.read("configure.ac"))
+		assert found, "configure.ac has no readable AC_INIT version"
+		assert found.group(1) == build.read_version()
+
+	def test_the_control_file_matches_too(self):
+		# Rewritten in the package, so a wrong value here only misleads a
+		# reader -- and a reader is exactly who opens this file.
+		found = re.search(r"^Version:\s*(\S+)\s*$",
+			self.read(os.path.join("CONTROL", "control")), re.MULTILINE)
+		assert found, "CONTROL/control has no Version line"
+		assert found.group(1) == build.read_version()
+
+	def test_the_changelog_leads_with_the_plugin_version(self):
+		found = re.search(r"^## \[([^\]]+)\]",
+			self.read("CHANGELOG.md"), re.MULTILINE)
+		assert found, "CHANGELOG.md has no version heading"
+		assert found.group(1) == build.read_version()
 
 
 class TestIpk:
