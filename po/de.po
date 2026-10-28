@@ -588,3 +588,9 @@ msgstr "Bouquet mit %d Kamera(s) angelegt."
 
 msgid "Bouquet removed."
 msgstr "Bouquet entfernt."
+
+msgid "All cameras"
+msgstr "Alle Kameras"
+
+msgid "No cameras selected"
+msgstr "Keine Kameras ausgewählt"

@@ -34,6 +34,10 @@ from .localisation import _
 # seconds, which is as precise as "is it online" can usefully be.
 REFRESH_INTERVAL = 5.0
 
+# How often the grid refetches snapshots. One request per camera per frame
+# would hammer the console for a picture nobody is studying that closely.
+GRID_INTERVAL = 2.0
+
 
 class DisplayManager(object):
 	"""Owns the plugin's long-lived state for one enigma2 session."""
@@ -66,6 +70,8 @@ class DisplayManager(object):
 		self._webhook = None
 		self._motion_until = 0.0
 		self._bouquet_proxy = None
+		self._grid_cache = None
+		self._grid_fetched = 0.0
 
 	@classmethod
 	def get(cls, session=None):
@@ -290,7 +296,8 @@ class DisplayManager(object):
 		ffmpeg = self.capabilities.which("ffmpeg") or "ffmpeg"
 		proxy = TsProxy(
 			ffmpeg_path=ffmpeg, port=config.bouquet_port.value,
-			log=self.log, url_resolver=self._resolve_token)
+			log=self.log, url_resolver=self._resolve_token,
+			offline_card=self._offline_card, grid_source=self._grid_frame)
 		try:
 			proxy.start()
 		except Exception as exc:  # noqa: BLE001
@@ -308,6 +315,8 @@ class DisplayManager(object):
 		if self._bouquet_proxy is not None:
 			self._bouquet_proxy.stop()
 			self._bouquet_proxy = None
+		self._grid_cache = None
+		self._grid_fetched = 0.0
 
 	def _resolve_token(self, token):
 		"""Look up a camera's stream when its bouquet entry is first played.
@@ -338,6 +347,50 @@ class DisplayManager(object):
 			url = to_plain_rtsp(url) or url
 		return camera_id, url
 
+	def _offline_card(self, camera_id):
+		"""A card for a camera the console cannot reach, else None.
+
+		Returning None means "stream it normally", so this is also the one
+		place deciding what offline means for the channel list.
+		"""
+		from . import cards
+		if not cards.available():
+			return None
+		if self.store.is_connected(camera_id):
+			return None
+		return cards.offline_card(self.store.name_for(camera_id))
+
+	def _grid_frame(self):
+		"""One picture of every selected camera.
+
+		Snapshots are fetched here, on a proxy thread, and cached for a
+		couple of seconds: the grid updates about as fast as the cameras
+		can be asked, and a slow console stalls nothing because the
+		previous frame is simply shown again.
+		"""
+		from . import cards
+		if not cards.available():
+			return None
+		now = time.time()
+		if now - self._grid_fetched < GRID_INTERVAL and self._grid_cache:
+			return self._grid_cache
+		self._grid_fetched = now
+		tiles = []
+		for camera_id in self.store.enabled_ids():
+			name = self.store.name_for(camera_id)
+			image = None
+			if self.store.is_connected(camera_id):
+				try:
+					image = self.api.get_snapshot(camera_id)
+				except Exception as exc:  # noqa: BLE001
+					self.log.debug("no snapshot for %s: %s", camera_id, exc)
+			tiles.append((name, image))
+		if not tiles:
+			self._grid_cache = cards.message_card(_("No cameras selected"))
+		else:
+			self._grid_cache = cards.grid_card(tiles)
+		return self._grid_cache
+
 	def bouquet_entries(self):
 		"""``[(label, reference), ...]`` for the selected cameras."""
 		from . import bouquet as bouquet_module
@@ -351,6 +404,11 @@ class DisplayManager(object):
 		for (camera_id, _name), label in zip(cameras, labels):
 			token = self.store.token_for(camera_id)
 			url = "http://127.0.0.1:%d/cam/%s" % (port, token)
+			entries.append((label, servicerefs.build_pip_reference(url, label)))
+		if entries and config.bouquet_grid.value:
+			# Last, so it does not come between the cameras when paging.
+			label = _("All cameras")
+			url = "http://127.0.0.1:%d/grid" % port
 			entries.append((label, servicerefs.build_pip_reference(url, label)))
 		self.store.save()
 		return entries

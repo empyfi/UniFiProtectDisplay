@@ -147,3 +147,60 @@ class TestPaths:
 	@pytest.mark.parametrize("directory", ["/etc/enigma2", "/etc/enigma2/"])
 	def test_a_trailing_slash_is_tolerated(self, directory):
 		assert "//" not in bouquet.bouquet_path(directory)
+
+
+class TestGridLayout:
+	"""How many tiles fit, and in what shape."""
+
+	def test_one_camera_fills_the_frame(self):
+		from UnifiProtectDisplay import cards
+		# A single camera alone in a corner of a 2x2 grid would be absurd.
+		assert cards.grid_layout(1) == (1, 1)
+
+	def test_up_to_four_is_two_by_two(self):
+		from UnifiProtectDisplay import cards
+		for count in (2, 3, 4):
+			assert cards.grid_layout(count) == (2, 2)
+
+	def test_up_to_nine_is_three_by_three(self):
+		from UnifiProtectDisplay import cards
+		assert cards.grid_layout(5) == (3, 3)
+		assert cards.grid_layout(9) == (3, 3)
+
+	def test_up_to_sixteen_is_four_by_four(self):
+		from UnifiProtectDisplay import cards
+		assert cards.grid_layout(10) == (4, 4)
+		assert cards.grid_layout(16) == (4, 4)
+
+	def test_more_than_sixteen_still_fits(self):
+		from UnifiProtectDisplay import cards
+		columns, rows = cards.grid_layout(20)
+		assert columns * rows >= 20
+
+
+class TestCards:
+	"""The pictures served when there is no camera feed to serve."""
+
+	def test_offline_card_is_a_jpeg(self):
+		from UnifiProtectDisplay import cards
+		if not cards.available():
+			import pytest as _pytest
+			_pytest.skip("PIL not installed")
+		data = cards.offline_card("Cam 2")
+		assert data[:2] == b"\xff\xd8"  # JPEG magic
+
+	def test_grid_renders_with_a_missing_tile(self):
+		# One unreachable camera must not blank the grid or shift the rest.
+		from UnifiProtectDisplay import cards
+		if not cards.available():
+			import pytest as _pytest
+			_pytest.skip("PIL not installed")
+		data = cards.grid_card([("Cam 1", None), ("Cam 2", None)])
+		assert data[:2] == b"\xff\xd8"
+
+	def test_message_card_is_a_jpeg(self):
+		from UnifiProtectDisplay import cards
+		if not cards.available():
+			import pytest as _pytest
+			_pytest.skip("PIL not installed")
+		assert cards.message_card("Nothing here")[:2] == b"\xff\xd8"

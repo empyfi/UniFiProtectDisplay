@@ -119,6 +119,10 @@ def init_config():
 	# route anyone else in the house will use.
 	settings.bouquet = ConfigYesNo(default=False)
 	settings.bouquet_port = ConfigInteger(default=8098, limits=(1024, 65535))
+	# One more entry showing every camera at once, as stills. Live video in
+	# a grid would need a decoder per camera and an encoder the box does
+	# not have; stills need neither.
+	settings.bouquet_grid = ConfigYesNo(default=True)
 
 	settings.pip_key = ConfigYesNo(default=False)
 

@@ -19,44 +19,52 @@ msgstr ""
 msgid "ffmpeg is not installed (opkg install ffmpeg)"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:178
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:184
 msgid "The corner display is switched off in setup."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:182
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:259
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:188
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:265
 msgid "No cameras are selected. Open the camera list first."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:189
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:195
 msgid "Unknown display mode: %s"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:209
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:215
 msgid "Could not start the overlay: %s"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:363
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:389
+msgid "No cameras selected"
+msgstr ""
+
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:410
+msgid "All cameras"
+msgstr ""
+
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:421
 msgid "No cameras are selected."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:377
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:435
 msgid "Could not write the bouquet: %s"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:380
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:438
 msgid "Bouquet created with %d camera(s)."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:401
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:459
 msgid "Could not remove the bouquet: %s"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:403
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:461
 msgid "Bouquet removed."
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:562
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/manager.py:620
 msgid "Picture in Picture is not available here."
 msgstr ""
 
@@ -169,11 +177,11 @@ msgstr ""
 msgid "Keep proportions (smaller picture)"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/settings.py:132
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/settings.py:136
 msgid "Show the camera, switching the corner on if needed"
 msgstr ""
 
-#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/settings.py:133
+#: src/usr/lib/enigma2/python/Plugins/Extensions/UnifiProtectDisplay/settings.py:137
 msgid "Only switch over while the corner is already on"
 msgstr ""
 

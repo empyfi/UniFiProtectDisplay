@@ -39,6 +39,9 @@ except ImportError:  # pragma: no cover
 
 BIND_HOST = "127.0.0.1"
 PATH_PREFIX = "/cam/"
+# The grid is a route of its own: it has no camera and no token, because it
+# is every selected camera at once.
+GRID_PATH = "/grid"
 
 # eHttpStream treats a handful of content types as playlists and then tries to
 # read a URL out of the body (lib/base/httpstream.cpp). video/mp2t is not one
@@ -109,7 +112,7 @@ class TsProxy(object):
 
 	def __init__(self, ffmpeg_path="ffmpeg", port=0, log=None,
 			popen=None, args_builder=None, server_factory=None,
-			url_resolver=None):
+			url_resolver=None, offline_card=None, grid_source=None):
 		self.ffmpeg_path = ffmpeg_path
 		self.requested_port = port
 		self.port = None
@@ -122,6 +125,12 @@ class TsProxy(object):
 		# receiver does not make a Protect request per camera at boot.
 		# Runs on a server thread, so blocking there is fine.
 		self._url_resolver = url_resolver
+		# Returns a JPEG when the camera cannot be streamed, or None to go
+		# ahead with the remux. Keeps the proxy from needing to know what
+		# "offline" means.
+		self._offline_card = offline_card
+		# Returns a JPEG of all cameras, for the grid route.
+		self._grid_source = grid_source
 		self._sources = {}  # token -> _Source
 		self._by_camera = {}  # camera_id -> token
 		self._server = None
@@ -233,6 +242,44 @@ class TsProxy(object):
 
 	# -- streaming --------------------------------------------------------
 
+	def grid_url(self):
+		"""Loopback URL of the grid, or None when it is not available."""
+		if not self.running or self._grid_source is None:
+			return None
+		return "http://%s:%d%s" % (BIND_HOST, self.port, GRID_PATH)
+
+	def stream_cards(self, frame_source, write, should_continue=None):
+		"""Serve a series of pictures as a transport stream.
+
+		Used for the offline card and the grid, so a bouquet entry plays
+		something in both cases rather than failing. See
+		:mod:`player.imagestream` for why encoding these is affordable
+		when encoding live video is not.
+		"""
+		from .imagestream import ImageStreamer
+		streamer = ImageStreamer(
+			frame_source, ffmpeg_path=self.ffmpeg_path, log=self._log)
+		return streamer.stream(write, should_continue)
+
+	def offline_frame(self, camera_id):
+		"""A card for an unreachable camera, or None to stream normally."""
+		if self._offline_card is None:
+			return None
+		try:
+			return self._offline_card(camera_id)
+		except Exception as exc:  # noqa: BLE001
+			self._warn("could not render the offline card: %s", exc)
+			return None
+
+	def grid_frame(self):
+		if self._grid_source is None:
+			return None
+		try:
+			return self._grid_source()
+		except Exception as exc:  # noqa: BLE001
+			self._warn("could not render the grid: %s", exc)
+			return None
+
 	def stream(self, source, write, should_continue=None):
 		"""Pump remuxed TS from ffmpeg into ``write`` until the client leaves.
 
@@ -331,8 +378,21 @@ def _handler_for(proxy):
 		# not need chunked encoding.
 		protocol_version = "HTTP/1.0"
 
+		def _begin(self):
+			self.send_response(200)
+			self.send_header("Content-Type", CONTENT_TYPE)
+			self.send_header("Cache-Control", "no-store")
+			self.end_headers()
+
 		def do_GET(self):  # noqa: N802 - name fixed by BaseHTTPRequestHandler
-			path = self.path.split("?", 1)[0]
+			path = self.path.split("?", 1)[0].rstrip("/") or "/"
+			if path == GRID_PATH:
+				if proxy.grid_frame() is None:
+					self.send_error(404, "No grid")
+					return
+				self._begin()
+				proxy.stream_cards(proxy.grid_frame, self.wfile.write)
+				return
 			if not path.startswith(PATH_PREFIX):
 				self.send_error(404, "Not found")
 				return
@@ -341,11 +401,24 @@ def _handler_for(proxy):
 			if source is None:
 				self.send_error(404, "Unknown stream")
 				return
-			self.send_response(200)
-			self.send_header("Content-Type", CONTENT_TYPE)
-			self.send_header("Cache-Control", "no-store")
-			self.end_headers()
+			card = proxy.offline_frame(source.camera_id)
+			if card is not None:
+				# The camera cannot be streamed. Say so on screen rather
+				# than leaving the channel dead: whoever is watching may
+				# have no other way to tell the two apart.
+				self._info("camera %s is offline; serving a card",
+					source.camera_id)
+				self._begin()
+				proxy.stream_cards(
+					lambda: proxy.offline_frame(source.camera_id),
+					self.wfile.write)
+				return
+			self._begin()
 			proxy.stream(source, self.wfile.write)
+
+		def _info(self, message, *args):
+			if proxy._log is not None:
+				proxy._log.info(message, *args)
 
 		def log_message(self, fmt, *args):
 			# BaseHTTPRequestHandler logs every request to stderr, which on a
