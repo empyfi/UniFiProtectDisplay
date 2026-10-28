@@ -609,3 +609,12 @@ msgstr "Eintrag mit Rotation hinzufügen"
 
 msgid "One more channel that plays the cameras in turn by changing channel, using the interval above. Real video, so each change takes as long as that camera needs to start. Changing channel leaves it."
 msgstr "Ein weiterer Kanal, der die Kameras nacheinander zeigt, indem er im eingestellten Abstand umschaltet. Echtes Bewegtbild, also dauert jeder Wechsel so lange, wie die Kamera zum Starten braucht. Umschalten beendet ihn."
+
+msgid "Add an entry that rotates as stills"
+msgstr "Eintrag mit Rotation als Standbilder hinzufügen"
+
+msgid "One more channel showing one camera at a time as stills, changing camera on the interval above. The camera changes instantly because nothing restarts, and the picture is renewed as often as the snapshot interval says."
+msgstr "Ein weiterer Kanal, der eine Kamera nach der anderen als Standbild zeigt und im eingestellten Abstand weiterschaltet. Der Kamerawechsel erfolgt sofort, weil nichts neu startet; das Bild wird so oft erneuert, wie es der Schnappschuss-Abstand vorgibt."
+
+msgid "Rotation (stills)"
+msgstr "Rotation (Bilder)"

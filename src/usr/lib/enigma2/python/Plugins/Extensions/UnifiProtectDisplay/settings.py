@@ -127,6 +127,11 @@ def init_config():
 	# timer. Real video, unlike the grid, at the price of a service
 	# restart per camera -- see the zaprotation module.
 	settings.bouquet_rotate = ConfigYesNo(default=False)
+	# The same idea the other way round: one service throughout, showing
+	# a snapshot of whichever camera's turn it is. The camera changes
+	# instantly because nothing restarts; the price is stills. Uses
+	# rotate_interval per camera and snapshot_interval per picture.
+	settings.bouquet_slides = ConfigYesNo(default=False)
 
 	settings.pip_key = ConfigYesNo(default=False)
 

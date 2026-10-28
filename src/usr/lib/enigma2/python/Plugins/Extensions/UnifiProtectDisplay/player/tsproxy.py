@@ -50,6 +50,19 @@ GRID_PATH = "/grid"
 # which would otherwise be a channel that does nothing at all.
 ROTATE_PATH = "/rotate"
 
+# Rotation the other way round: one service throughout, showing a
+# snapshot of whichever camera's turn it is. Nothing is re-encoded
+# twice and nothing restarts, so the camera changes instantly.
+SLIDES_PATH = "/slides"
+
+# Faster than the two frames a second the cards use. The encoder is
+# primed with a fixed number of frames so that a zap shows something
+# quickly, and that priming is what puts the stream behind the world:
+# at two frames a second it is two seconds, at four it is one. For a
+# card nobody can tell; for a camera you are watching to see whether
+# anybody is at the door, a second is worth the extra frames.
+SLIDES_FRAMERATE = 4
+
 # eHttpStream treats a handful of content types as playlists and then tries to
 # read a URL out of the body (lib/base/httpstream.cpp). video/mp2t is not one
 # of them, which is exactly what we need.
@@ -120,7 +133,7 @@ class TsProxy(object):
 	def __init__(self, ffmpeg_path="ffmpeg", port=0, log=None,
 			popen=None, args_builder=None, server_factory=None,
 			url_resolver=None, offline_card=None, grid_source=None,
-			problem_card=None, rotate_source=None):
+			problem_card=None, rotate_source=None, slides_source=None):
 		self.ffmpeg_path = ffmpeg_path
 		self.requested_port = port
 		self.port = None
@@ -145,6 +158,8 @@ class TsProxy(object):
 		self._grid_source = grid_source
 		# Returns a JPEG for the rotation route.
 		self._rotate_source = rotate_source
+		# Returns a JPEG for the rotating-stills route.
+		self._slides_source = slides_source
 		self._sources = {}  # token -> _Source
 		self._by_camera = {}  # camera_id -> token
 		self._camera_by_token = {}  # token -> camera_id, for the offline check
@@ -285,7 +300,14 @@ class TsProxy(object):
 			return None
 		return "http://%s:%d%s" % (BIND_HOST, self.port, ROTATE_PATH)
 
-	def stream_cards(self, frame_source, write, should_continue=None):
+	def slides_url(self):
+		"""Loopback URL of the rotating-stills entry, or None."""
+		if not self.running or self._slides_source is None:
+			return None
+		return "http://%s:%d%s" % (BIND_HOST, self.port, SLIDES_PATH)
+
+	def stream_cards(self, frame_source, write, should_continue=None,
+			framerate=None):
 		"""Serve a series of pictures as a transport stream.
 
 		Used for the offline card and the grid, so a bouquet entry plays
@@ -296,7 +318,8 @@ class TsProxy(object):
 		from .imagestream import ImageStreamer
 		streamer = ImageStreamer(
 			frame_source, ffmpeg_path=self.ffmpeg_path, log=self._log,
-			popen=self._popen)
+			popen=self._popen,
+			**({"framerate": framerate} if framerate else {}))
 		return streamer.stream(write, should_continue)
 
 	def offline_frame(self, camera_id):
@@ -335,6 +358,15 @@ class TsProxy(object):
 			return self._rotate_source()
 		except Exception as exc:  # noqa: BLE001
 			self._warn("could not render the rotation card: %s", exc)
+			return None
+
+	def slides_frame(self):
+		if self._slides_source is None:
+			return None
+		try:
+			return self._slides_source()
+		except Exception as exc:  # noqa: BLE001
+			self._warn("could not render the next slide: %s", exc)
 			return None
 
 	def stream(self, source, write, should_continue=None):
@@ -443,14 +475,20 @@ def _handler_for(proxy):
 
 		def do_GET(self):  # noqa: N802 - name fixed by BaseHTTPRequestHandler
 			path = self.path.split("?", 1)[0].rstrip("/") or "/"
-			if path in (GRID_PATH, ROTATE_PATH):
-				source = (proxy.grid_frame if path == GRID_PATH
-					else proxy.rotate_frame)
+			if path in (GRID_PATH, ROTATE_PATH, SLIDES_PATH):
+				source = {
+					GRID_PATH: proxy.grid_frame,
+					ROTATE_PATH: proxy.rotate_frame,
+					SLIDES_PATH: proxy.slides_frame,
+				}[path]
 				if source() is None:
 					self.send_error(404, "Not available")
 					return
 				self._begin()
-				proxy.stream_cards(source, self.wfile.write)
+				proxy.stream_cards(
+					source, self.wfile.write,
+					framerate=(SLIDES_FRAMERATE if path == SLIDES_PATH
+						else None))
 				return
 			if not path.startswith(PATH_PREFIX):
 				self.send_error(404, "Not found")

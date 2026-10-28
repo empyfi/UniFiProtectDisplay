@@ -91,6 +91,7 @@ class DisplayManager(object):
 		self._grid_cache = None
 		self._grid_fetched = 0.0
 		self._connected_checked = 0.0
+		self._slides = None
 		self._zap_rotation = None
 		self._zap_hooked = False
 		self._zap_timer = None
@@ -191,6 +192,8 @@ class DisplayManager(object):
 	def refresh_selection(self):
 		"""Pick up a change made in the camera list screen."""
 		self.rotation.set_cameras(self.store.enabled_ids())
+		# Built from the selection, so a changed selection rebuilds it.
+		self._slides = None
 		# The rotation channel holds one reference per camera, so a
 		# changed selection makes its list wrong.
 		self.start_zap_rotation()
@@ -328,7 +331,8 @@ class DisplayManager(object):
 			log=self.log, url_resolver=self._resolve_token,
 			offline_card=self._offline_card, grid_source=self._grid_frame,
 			problem_card=self._problem_card,
-			rotate_source=self._rotate_frame)
+			rotate_source=self._rotate_frame,
+			slides_source=self._slides_frame)
 		try:
 			proxy.start()
 		except Exception as exc:  # noqa: BLE001
@@ -349,6 +353,7 @@ class DisplayManager(object):
 		self._grid_cache = None
 		self._grid_fetched = 0.0
 		self._connected_checked = 0.0
+		self._slides = None
 
 	def _resolve_token(self, token):
 		"""Look up a camera's stream when its bouquet entry is first played.
@@ -451,6 +456,56 @@ class DisplayManager(object):
 			return None
 		return cards.message_card(_("Rotation"))
 
+	def _slides_frame(self):
+		"""The next picture for the rotating-stills channel.
+
+		Called by the encoder's feeder thread, several times a second;
+		:class:`~slideshow.SlideRotation` answers None for most of them,
+		which is what keeps the console from being asked sixty times a
+		minute. Its cursor is its own, so watching this channel does not
+		drag the corner along with it.
+		"""
+		from . import cards
+		from .rotation import Rotation
+		from .slideshow import SlideRotation
+		if not cards.available():
+			return None
+		config = settings_module.get_config()
+		if self._slides is None:
+			self._slides = SlideRotation(
+				Rotation(self.store.enabled_ids()),
+				fetch=lambda camera_id: self.api.get_snapshot(camera_id),
+				describe=self._describe_camera,
+				render=self._render_slide,
+				interval=int(config.rotate_interval.value),
+				refresh=int(config.snapshot_interval.value))
+		return self._slides.frame(time.time())
+
+	def _describe_camera(self, camera_id):
+		"""Name and reachability for one slide.
+
+		The numbered label, not the bare name. Protect lets two cameras
+		share a name and they often do straight out of the box -- on the
+		console this was built against both are called "G3 Flex" -- so
+		two slides reading "G3 Flex" tell nobody which camera they are
+		looking at. Saying which camera this is happens to be the one
+		thing a rotating channel has to get right.
+		"""
+		return self._label_for_camera(camera_id), self._connected_now(camera_id)
+
+	def _label_for_camera(self, camera_id):
+		"""The label the channel list uses for this camera."""
+		for entry_id, label, _reference in self.camera_entries():
+			if entry_id == camera_id:
+				return label
+		return self.store.name_for(camera_id)
+
+	def _render_slide(self, name, data):
+		from . import cards
+		if name is None:
+			return cards.message_card(_("No cameras selected"))
+		return cards.slide_card(name, data)
+
 	def _grid_frame(self):
 		"""One picture of every selected camera.
 
@@ -530,6 +585,24 @@ class DisplayManager(object):
 		url = "http://127.0.0.1:%d%s" % (config.bouquet_port.value, ROTATE_PATH)
 		return label, servicerefs.build_pip_reference(url, label)
 
+	def _slides_entry(self):
+		"""``(label, reference)`` for the rotating-stills channel, or None.
+
+		Absent with fewer than two cameras, for the same reason the
+		rotation entry is: a channel that behaves exactly like the one
+		above it is clutter.
+		"""
+		from . import servicerefs
+		from .player.tsproxy import SLIDES_PATH
+		config = settings_module.get_config()
+		if not config.bouquet_slides.value:
+			return None
+		if len(self.store.enabled_ids()) < 2:
+			return None
+		label = _("Rotation (stills)")
+		url = "http://127.0.0.1:%d%s" % (config.bouquet_port.value, SLIDES_PATH)
+		return label, servicerefs.build_pip_reference(url, label)
+
 	def bouquet_entries(self):
 		"""``[(label, reference), ...]`` for the bouquet file."""
 		from . import servicerefs
@@ -546,6 +619,9 @@ class DisplayManager(object):
 		rotation_entry = self._rotation_entry()
 		if entries and rotation_entry is not None:
 			entries.append(rotation_entry)
+		slides_entry = self._slides_entry()
+		if entries and slides_entry is not None:
+			entries.append(slides_entry)
 		self.store.save()
 		return entries
 

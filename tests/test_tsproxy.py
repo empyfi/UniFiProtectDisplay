@@ -490,6 +490,60 @@ class TestOfflineComesFirst:
 			proxy.stop()
 
 
+class TestCardRoutes:
+	"""The routes that serve a picture rather than a camera."""
+
+	@staticmethod
+	def make(popen, **kwargs):
+		proxy = TsProxy(
+			popen=popen, args_builder=lambda url, ffmpeg: ["x"], **kwargs)
+		proxy.start()
+		return proxy
+
+	def test_the_slides_route_serves_a_stream(self):
+		proxy = self.make(
+			FakePopen(payload=b"ts"),
+			slides_source=lambda: b"\xff\xd8slide")
+		try:
+			response = TestHttpContract.raw_get(proxy.port, "/slides")
+			assert b" 200 " in response.split(b"\r\n", 1)[0]
+		finally:
+			proxy.stop()
+
+	def test_the_slides_route_is_404_without_a_source(self):
+		proxy = self.make(FakePopen(payload=b"ts"))
+		try:
+			response = TestHttpContract.raw_get(proxy.port, "/slides")
+			assert b" 404 " in response.split(b"\r\n", 1)[0]
+		finally:
+			proxy.stop()
+
+	def test_slides_run_faster_than_the_cards(self):
+		# The priming cushion is frames divided by frame rate, so the
+		# frame rate is what decides how far behind the world a camera
+		# you are actually watching ends up.
+		popen = FakePopen(payload=b"ts")
+		proxy = self.make(popen, slides_source=lambda: b"\xff\xd8slide")
+		try:
+			TestHttpContract.raw_get(proxy.port, "/slides")
+			args = popen.calls[-1]["args"]
+			rate = int(args[args.index("-framerate") + 1])
+			assert rate == tsproxy.SLIDES_FRAMERATE
+			assert rate > 2
+		finally:
+			proxy.stop()
+
+	def test_the_grid_keeps_the_card_frame_rate(self):
+		popen = FakePopen(payload=b"ts")
+		proxy = self.make(popen, grid_source=lambda: b"\xff\xd8grid")
+		try:
+			TestHttpContract.raw_get(proxy.port, "/grid")
+			args = popen.calls[-1]["args"]
+			assert int(args[args.index("-framerate") + 1]) == 2
+		finally:
+			proxy.stop()
+
+
 class TestBinding:
 	def test_binds_to_loopback_only(self, proxy):
 		# An unauthenticated camera feed must not appear on the LAN because

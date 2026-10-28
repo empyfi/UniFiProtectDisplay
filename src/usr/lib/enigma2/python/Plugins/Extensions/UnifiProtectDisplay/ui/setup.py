@@ -191,6 +191,12 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 				_("One more channel with all the cameras at once, as "
 					"stills. Live video in a grid would need a decoder "
 					"per camera, which the box does not have.")),
+			(_("Add an entry that rotates as stills"), cfg.bouquet_slides,
+				_("One more channel showing one camera at a time as "
+					"stills, changing camera on the interval above. The "
+					"camera changes instantly because nothing restarts, "
+					"and the picture is renewed as often as the snapshot "
+					"interval says.")),
 			(_("Add an entry that rotates"), cfg.bouquet_rotate,
 				_("One more channel that plays the cameras in turn by "
 					"changing channel, using the interval above. Real "

@@ -73,6 +73,7 @@ SETTINGS = {
 	"bouquet": (BOOLEAN, False),
 	"bouquet_grid": (BOOLEAN, True),
 	"bouquet_rotate": (BOOLEAN, False),
+	"bouquet_slides": (BOOLEAN, False),
 	"bouquet_port": (PLAIN, "8098"),
 	"webhook": (BOOLEAN, False),
 	"webhook_port": (PLAIN, "8099"),
@@ -464,6 +465,12 @@ def build_parser():
 		help="add an entry that plays the cameras in turn")
 	channel.add_argument(
 		"--no-bouquet-rotate", dest="bouquet_rotate", action="store_false")
+	channel.add_argument(
+		"--bouquet-slides", dest="bouquet_slides", action="store_true",
+		default=None,
+		help="add an entry that rotates through the cameras as stills")
+	channel.add_argument(
+		"--no-bouquet-slides", dest="bouquet_slides", action="store_false")
 
 	behaviour = parser.add_argument_group("behaviour")
 	behaviour.add_argument(
@@ -495,6 +502,7 @@ def collect_overrides(args, api_key):
 		("bouquet", "bouquet"), ("bouquet_port", "bouquet_port"),
 		("bouquet_grid", "bouquet_grid"),
 		("bouquet_rotate", "bouquet_rotate"),
+		("bouquet_slides", "bouquet_slides"),
 		("webhook", "webhook"), ("webhook_port", "webhook_port"),
 		("motion_action", "motion_action"), ("motion_hold", "motion_hold"),
 		("debug", "debug"),

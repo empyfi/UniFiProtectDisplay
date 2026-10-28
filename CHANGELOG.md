@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [semantic versioning](https://semver.org/).
 
+## [0.8.0] - 2026-10-28
+
+### Added
+- **A "rotation (stills)" entry**: the cameras in turn, the other way
+  round from the rotation entry added in 0.7.0. One service plays
+  throughout and what goes into it is a snapshot of whichever camera's
+  turn it is, so the camera changes instantly instead of costing a
+  service restart, and a camera that is down shows its card in its turn
+  rather than holding everything up. Both entries can be in the bouquet
+  at once; they are a trade of the same coin.
+
+  About one new picture a second -- the snapshot interval decides, 1 to
+  30 seconds -- running about a second behind the world. It runs at four
+  frames a second rather than the two the cards use: the encoder is
+  primed with a fixed number of frames so a zap shows something quickly,
+  and that priming is exactly what puts the stream behind, so the higher
+  rate halves the lag. Measured on a receiver: a picture 0.6 to 0.9
+  seconds after the channel is selected, and the camera changing on
+  schedule.
+
+  Switched on in setup, or with `tools/configure.py --bouquet-slides`.
+
+### Fixed
+- Slides name the camera the way the channel list does, numbered.
+  Protect lets two cameras share a name and both on the console this was
+  built against are called "G3 Flex", so the bare name told nobody which
+  camera was on screen -- which is the one thing a rotating channel has
+  to get right.
+
 ## [0.7.0] - 2026-10-28
 
 The channel list is the part of this plugin anybody else in the house will

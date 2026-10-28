@@ -232,6 +232,29 @@ class TestCards:
 		data = cards.grid_card([("Cam 1", None), ("Cam 2", None)])
 		assert data[:2] == b"\xff\xd8"
 
+	def test_a_slide_is_a_jpeg(self):
+		from UnifiProtectDisplay import cards
+		if not cards.available():
+			import pytest as _pytest
+			_pytest.skip("PIL not installed")
+		data = cards.grid_card([("Cam 1", None)])
+		assert cards.slide_card("Cam 1", data)[:2] == b"\xff\xd8"
+
+	def test_a_slide_without_a_picture_is_the_offline_card(self):
+		from UnifiProtectDisplay import cards
+		if not cards.available():
+			import pytest as _pytest
+			_pytest.skip("PIL not installed")
+		assert cards.slide_card("Cam 1", None) == cards.offline_card("Cam 1")
+
+	def test_a_slide_of_an_unreadable_picture_does_not_raise(self):
+		# A truncated snapshot must not take the channel down.
+		from UnifiProtectDisplay import cards
+		if not cards.available():
+			import pytest as _pytest
+			_pytest.skip("PIL not installed")
+		assert cards.slide_card("Cam 1", b"not a jpeg at all")[:2] == b"\xff\xd8"
+
 	def test_message_card_is_a_jpeg(self):
 		from UnifiProtectDisplay import cards
 		if not cards.available():

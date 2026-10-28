@@ -113,6 +113,44 @@ def offline_card(name="", size=DEFAULT_SIZE, message="OFFLINE"):
 	return _encode(image)
 
 
+def slide_card(name, data, size=DEFAULT_SIZE):
+	"""One camera filling the frame, with its name along the bottom.
+
+	The picture the rotating stills channel shows. A tile of the grid
+	would do the job, but the proportions do not survive the change of
+	scale: the grid sizes its lettering from the tile, and a tile that is
+	the whole television then carries a caption four centimetres tall.
+	So the band and the lettering are a smaller fraction here.
+
+	Without a picture this is the offline card, which already says the
+	right thing in the right size.
+	"""
+	if not available():
+		return None
+	if not data:
+		return offline_card(name)
+	width, height = size
+	image = Image.new("RGB", (width, height), BACKGROUND)
+	try:
+		picture = _fit(
+			Image.open(io.BytesIO(data)).convert("RGB"), width, height)
+	except Exception:  # noqa: BLE001
+		return offline_card(name)
+	x = (width - picture.width) // 2
+	y = (height - picture.height) // 2
+	image.paste(picture, (x, y))
+	if name:
+		draw = ImageDraw.Draw(image)
+		band = max(24, picture.height // 12)
+		draw.rectangle(
+			[x, y + picture.height - band, x + picture.width,
+				y + picture.height],
+			fill=(0, 0, 0))
+		_centre(draw, name, _font(max(16, band * 2 // 3)),
+			(x, y + picture.height - band, picture.width, band))
+	return _encode(image)
+
+
 def message_card(text, size=DEFAULT_SIZE):
 	"""A plain card, for states that are neither a camera nor an error."""
 	if not available():

@@ -125,7 +125,28 @@ bouquet from the plugin's own menu. Three kinds of entry can appear:
   because it works by changing channel on a timer rather than by
   re-encoding anything. The cost is that every change is a service
   restart, so each camera arrives after however long its stream takes to
-  open. Changing channel is how you leave it, like any other channel.
+  open. Changing channel is how you leave it, like any other channel;
+- **Rotation (stills)** — the same idea the other way round. One service
+  plays throughout and what goes into it is a snapshot of whichever
+  camera's turn it is, so the camera changes instantly and an offline
+  camera simply shows its card in its turn. About one new picture a
+  second, running about a second behind the world.
+
+The two rotating entries are a trade of the same coin and can both be in
+the bouquet at once. Measured on a receiver, with the camera changing
+every fifteen seconds:
+
+| | Rotation | Rotation (stills) |
+|---|---|---|
+| Picture | the camera's own video | roughly one photograph a second |
+| Behind the world | as live as the stream is | about 1 s |
+| Changing camera | a service restart | instant |
+| An offline camera | its card, after a restart | its card, at once |
+
+How often the picture is renewed is the **snapshot interval** (1–30 s,
+two by default), and how long each camera gets is the **rotation
+interval**. At fifteen seconds a camera and a two-second snapshot
+interval, that is seven or eight different pictures per camera per turn.
 
 A camera the console cannot reach plays a black card naming it and saying
 **OFFLINE**, rather than a channel that simply fails — somebody watching may
