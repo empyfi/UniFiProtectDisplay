@@ -74,6 +74,30 @@ class CameraStore(object):
 		"""Every known camera, in display order, as ``(id, name, enabled)``."""
 		return [(e["id"], e["name"], e["enabled"]) for e in self._entries]
 
+	def token_for(self, camera_id):
+		"""A stable token identifying this camera in a proxy URL.
+
+		Stored rather than generated per session, because a reference in
+		the channel list has to keep working tomorrow. Created on first
+		use; the caller saves.
+		"""
+		import secrets
+		for entry in self._entries:
+			if entry["id"] == camera_id:
+				if not entry.get("token"):
+					entry["token"] = secrets.token_urlsafe(9)
+				return entry["token"]
+		return None
+
+	def camera_for_token(self, token):
+		"""Inverse of :meth:`token_for`, for resolving an incoming request."""
+		if not token:
+			return None
+		for entry in self._entries:
+			if entry.get("token") == token:
+				return entry["id"]
+		return None
+
 	def is_connected(self, camera_id):
 		"""Whether the console last reported this camera as reachable.
 
@@ -148,6 +172,7 @@ class CameraStore(object):
 					"name": camera.name or camera.id,
 					"enabled": False,
 					"connected": bool(camera.connected),
+					"token": "",
 				})
 				added += 1
 			else:
@@ -190,6 +215,8 @@ def _normalise(item):
 		# Absent in files written by older versions; assume reachable so a
 		# camera is never marked offline because of a missing field.
 		"connected": bool(item.get("connected", True)),
+		# Stable identifier used in bouquet URLs; empty until first needed.
+		"token": str(item.get("token") or ""),
 	}
 
 

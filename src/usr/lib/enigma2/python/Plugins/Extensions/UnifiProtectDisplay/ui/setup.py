@@ -182,6 +182,11 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 			])
 
 		entries.extend([
+			_divider(_("Channel list")),
+			(_("Put the cameras in the channel list"), cfg.bouquet,
+				_("Creates a bouquet so the cameras can be watched like "
+					"ordinary channels, with the remote everyone already "
+					"uses. Create it from the plugin menu afterwards.")),
 			_divider(_("Other")),
 			(_("Use the PiP key for the camera"), cfg.pip_key,
 				_("Long press shows the camera corner, and again steps to "

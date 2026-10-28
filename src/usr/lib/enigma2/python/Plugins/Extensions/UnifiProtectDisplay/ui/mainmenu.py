@@ -32,6 +32,7 @@ ACTION_NEXT = "next"
 ACTION_CAMERAS = "cameras"
 ACTION_SETUP = "setup"
 ACTION_WEBHOOK = "webhook"
+ACTION_BOUQUET = "bouquet"
 ACTION_WINDOW = "window"
 
 
@@ -117,6 +118,10 @@ class UnifiProtectMain(Screen):
 		rows.append(_("Next camera"))
 		self._actions.append(ACTION_NEXT)
 
+		if get_config().bouquet.value:
+			rows.append(_("Create or refresh the channel-list bouquet"))
+			self._actions.append(ACTION_BOUQUET)
+
 		rows.append(_("Cameras..."))
 		self._actions.append(ACTION_CAMERAS)
 
@@ -189,6 +194,13 @@ class UnifiProtectMain(Screen):
 			self._open_cameras()
 		elif action == ACTION_WINDOW:
 			self._edit_window()
+		elif action == ACTION_BOUQUET:
+			ok, message = self._manager.write_bouquet()
+			self.session.open(
+				MessageBox, message,
+				type=MessageBox.TYPE_INFO if ok else MessageBox.TYPE_ERROR,
+				timeout=8)
+			self._rebuild()
 		elif action == ACTION_WEBHOOK:
 			from .webhookinfo import UnifiProtectWebhookInfo
 			self.session.openWithCallback(

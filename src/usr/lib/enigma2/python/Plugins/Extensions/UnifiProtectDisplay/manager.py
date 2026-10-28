@@ -65,6 +65,7 @@ class DisplayManager(object):
 		self._refresh_task = None
 		self._webhook = None
 		self._motion_until = 0.0
+		self._bouquet_proxy = None
 
 	@classmethod
 	def get(cls, session=None):
@@ -144,6 +145,8 @@ class DisplayManager(object):
 		self.apply_key_binding()
 		self.stop_webhook()
 		self.start_webhook()
+		self.stop_bouquet_proxy()
+		self.start_bouquet_proxy()
 
 		# Restart only what was already on screen. Saving settings is not a
 		# request to switch the corner on, and a corner appearing by itself
@@ -268,6 +271,147 @@ class DisplayManager(object):
 		return True, ""
 
 	# -- misc -------------------------------------------------------------
+
+	# -- the channel-list bouquet -----------------------------------------
+
+	def start_bouquet_proxy(self):
+		"""Keep a proxy on a fixed port, so bouquet entries stay playable.
+
+		Different from the one the corner uses: that one takes any free
+		port and invents a token per session, which is fine for a reference
+		built moments earlier and useless for one sitting in a channel
+		list. Camera URLs are resolved on first play rather than at start,
+		so booting costs no Protect requests.
+		"""
+		config = settings_module.get_config()
+		if not config.bouquet.value or self._bouquet_proxy is not None:
+			return
+		from .player.tsproxy import TsProxy
+		ffmpeg = self.capabilities.which("ffmpeg") or "ffmpeg"
+		proxy = TsProxy(
+			ffmpeg_path=ffmpeg, port=config.bouquet_port.value,
+			log=self.log, url_resolver=self._resolve_token)
+		try:
+			proxy.start()
+		except Exception as exc:  # noqa: BLE001
+			self.log.error("could not start the bouquet proxy on port %s: %s",
+				config.bouquet_port.value, exc)
+			return
+		for camera_id in self.store.enabled_ids():
+			token = self.store.token_for(camera_id)
+			if token:
+				proxy.register_token(camera_id, token)
+		self.store.save()
+		self._bouquet_proxy = proxy
+
+	def stop_bouquet_proxy(self):
+		if self._bouquet_proxy is not None:
+			self._bouquet_proxy.stop()
+			self._bouquet_proxy = None
+
+	def _resolve_token(self, token):
+		"""Look up a camera's stream when its bouquet entry is first played.
+
+		Runs on a proxy thread, so blocking on the Protect API here is fine
+		and keeps the main loop out of it entirely.
+		"""
+		camera_id = self.store.camera_for_token(token)
+		if camera_id is None:
+			return None
+		cached = self.controller.cached_stream_url(camera_id)
+		if cached:
+			return camera_id, cached
+		try:
+			streams = self.api.get_rtsps_streams(camera_id)
+			if not len(streams):
+				streams = self.api.create_rtsps_streams(
+					camera_id, self.controller.settings.quality)
+			url = streams.url_for(self.controller.settings.quality)
+		except Exception as exc:  # noqa: BLE001
+			self.log.error("could not resolve the stream for %s: %s",
+				camera_id, exc)
+			return None
+		if not url:
+			return None
+		if self.controller.settings.use_plain_rtsp:
+			from .protect.models import to_plain_rtsp
+			url = to_plain_rtsp(url) or url
+		return camera_id, url
+
+	def bouquet_entries(self):
+		"""``[(label, reference), ...]`` for the selected cameras."""
+		from . import bouquet as bouquet_module
+		from . import servicerefs
+		config = settings_module.get_config()
+		port = config.bouquet_port.value
+		cameras = [
+			(cid, self.store.name_for(cid)) for cid in self.store.enabled_ids()]
+		labels = bouquet_module.labels_for(cameras)
+		entries = []
+		for (camera_id, _name), label in zip(cameras, labels):
+			token = self.store.token_for(camera_id)
+			url = "http://127.0.0.1:%d/cam/%s" % (port, token)
+			entries.append((label, servicerefs.build_pip_reference(url, label)))
+		self.store.save()
+		return entries
+
+	def write_bouquet(self):
+		"""Create or refresh the bouquet. Returns ``(ok, message)``."""
+		from . import bouquet as bouquet_module
+		entries = self.bouquet_entries()
+		if not entries:
+			return False, _("No cameras are selected.")
+		try:
+			with open(bouquet_module.bouquet_path(), "w") as handle:
+				handle.write(bouquet_module.build_bouquet(entries))
+			index_path = bouquet_module.index_path()
+			try:
+				with open(index_path, "r") as handle:
+					existing = handle.read()
+			except (OSError, IOError):
+				existing = ""
+			with open(index_path, "w") as handle:
+				handle.write(bouquet_module.add_to_index(existing))
+		except (OSError, IOError) as exc:
+			self.log.error("could not write the bouquet: %s", exc)
+			return False, _("Could not write the bouquet: %s") % exc
+		self._reload_bouquets()
+		self.log.info("bouquet written with %d camera(s)", len(entries))
+		return True, _("Bouquet created with %d camera(s).") % len(entries)
+
+	def remove_bouquet(self):
+		"""Take the bouquet out of the channel list again."""
+		from . import bouquet as bouquet_module
+		import os
+		try:
+			index_path = bouquet_module.index_path()
+			try:
+				with open(index_path, "r") as handle:
+					existing = handle.read()
+			except (OSError, IOError):
+				existing = ""
+			with open(index_path, "w") as handle:
+				handle.write(bouquet_module.remove_from_index(existing))
+			try:
+				os.remove(bouquet_module.bouquet_path())
+			except OSError:
+				pass
+		except (OSError, IOError) as exc:
+			self.log.error("could not remove the bouquet: %s", exc)
+			return False, _("Could not remove the bouquet: %s") % exc
+		self._reload_bouquets()
+		return True, _("Bouquet removed.")
+
+	def _reload_bouquets(self):
+		"""Make enigma2 notice the file without a restart."""
+		try:
+			from enigma import eDVBDB
+			db = eDVBDB.getInstance()
+			db.reloadBouquets()
+			db.reloadServicelist()
+		except Exception as exc:  # noqa: BLE001
+			self.log.error("could not reload the channel list (%s); "
+				"a restart will pick it up", exc)
 
 	# -- motion, reported by Protect ---------------------------------------
 
@@ -545,6 +689,7 @@ class DisplayManager(object):
 	def shutdown(self):
 		"""Release everything. Called when the session ends."""
 		self.stop_webhook()
+		self.stop_bouquet_proxy()
 		self.stop_corner()
 		self.runner.shutdown()
 		DisplayManager.instance = None

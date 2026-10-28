@@ -70,6 +70,8 @@ SETTINGS = {
 	"corner_fit": (PLAIN, "fill"),
 	"pip_key": (BOOLEAN, False),
 	"skip_offline": (BOOLEAN, True),
+	"bouquet": (BOOLEAN, False),
+	"bouquet_port": (PLAIN, "8098"),
 	"webhook": (BOOLEAN, False),
 	"webhook_port": (PLAIN, "8099"),
 	"webhook_token": (PLAIN, ""),
@@ -440,6 +442,16 @@ def build_parser():
 		"--webhook-urls", action="store_true",
 		help="print the URLs to paste into Protect, then exit")
 
+	channel = parser.add_argument_group("channel list")
+	channel.add_argument(
+		"--bouquet", dest="bouquet", action="store_true", default=None,
+		help="put the cameras in the channel list as a bouquet")
+	channel.add_argument(
+		"--no-bouquet", dest="bouquet", action="store_false")
+	channel.add_argument(
+		"--bouquet-port", dest="bouquet_port", type=int,
+		help="fixed port the bouquet entries point at (default 8098)")
+
 	behaviour = parser.add_argument_group("behaviour")
 	behaviour.add_argument(
 		"--reset", action="store_true",
@@ -467,6 +479,7 @@ def collect_overrides(args, api_key):
 		("skip_offline", "skip_offline"),
 		("plain_rtsp", "plain_rtsp"), ("autostart", "autostart"),
 		("corner_fit", "corner_fit"), ("pip_key", "pip_key"),
+		("bouquet", "bouquet"), ("bouquet_port", "bouquet_port"),
 		("webhook", "webhook"), ("webhook_port", "webhook_port"),
 		("motion_action", "motion_action"), ("motion_hold", "motion_hold"),
 		("debug", "debug"),

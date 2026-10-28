@@ -561,3 +561,30 @@ msgstr "In UniFi Protect: Alarm Manager > Neuer Alarm, einer pro Kamera.\nAuslö
 
 msgid "Motion reporting is switched off. Turn on \"React to motion reported by Protect\" in settings first."
 msgstr "Bewegungsmeldung ist abgeschaltet. Schalte in den Einstellungen zuerst „Auf Bewegung von Protect reagieren“ ein."
+
+msgid "Channel list"
+msgstr "Senderliste"
+
+msgid "Put the cameras in the channel list"
+msgstr "Kameras in die Senderliste aufnehmen"
+
+msgid "Creates a bouquet so the cameras can be watched like ordinary channels, with the remote everyone already uses. Create it from the plugin menu afterwards."
+msgstr "Legt ein Bouquet an, damit die Kameras wie normale Sender angesehen werden können - mit der Fernbedienung, die ohnehin alle benutzen. Erstellt wird es anschließend im Plugin-Menü."
+
+msgid "Create or refresh the channel-list bouquet"
+msgstr "Bouquet in der Senderliste anlegen oder aktualisieren"
+
+msgid "No cameras are selected."
+msgstr "Es sind keine Kameras ausgewählt."
+
+msgid "Could not write the bouquet: %s"
+msgstr "Das Bouquet konnte nicht geschrieben werden: %s"
+
+msgid "Could not remove the bouquet: %s"
+msgstr "Das Bouquet konnte nicht entfernt werden: %s"
+
+msgid "Bouquet created with %d camera(s)."
+msgstr "Bouquet mit %d Kamera(s) angelegt."
+
+msgid "Bouquet removed."
+msgstr "Bouquet entfernt."

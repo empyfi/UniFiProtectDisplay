@@ -119,6 +119,7 @@ def session_start(reason, session=None, **kwargs):
 	if config.pip_key.value:
 		manager.apply_key_binding()
 	manager.start_webhook()
+	manager.start_bouquet_proxy()
 
 	if not config.autostart.value or config.corner_mode.value == MODE_OFF:
 		return

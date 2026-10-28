@@ -108,7 +108,8 @@ class TsProxy(object):
 	"""
 
 	def __init__(self, ffmpeg_path="ffmpeg", port=0, log=None,
-			popen=None, args_builder=None, server_factory=None):
+			popen=None, args_builder=None, server_factory=None,
+			url_resolver=None):
 		self.ffmpeg_path = ffmpeg_path
 		self.requested_port = port
 		self.port = None
@@ -116,6 +117,11 @@ class TsProxy(object):
 		self._popen = popen or subprocess.Popen
 		self._args_builder = args_builder or default_ffmpeg_args
 		self._server_factory = server_factory or _make_server
+		# Called with a token when it is not registered: lets bouquet
+		# entries exist before any camera URL has been fetched, so the
+		# receiver does not make a Protect request per camera at boot.
+		# Runs on a server thread, so blocking there is fine.
+		self._url_resolver = url_resolver
 		self._sources = {}  # token -> _Source
 		self._by_camera = {}  # camera_id -> token
 		self._server = None
@@ -189,7 +195,41 @@ class TsProxy(object):
 
 	def source_for_token(self, token):
 		with self._lock:
-			return self._sources.get(token)
+			source = self._sources.get(token)
+		if source is not None:
+			return source
+		if self._url_resolver is None:
+			return None
+		try:
+			resolved = self._url_resolver(token)
+		except Exception as exc:  # noqa: BLE001
+			self._warn("could not resolve %s: %s", token, exc)
+			return None
+		if not resolved:
+			return None
+		camera_id, url = resolved
+		with self._lock:
+			source = _Source(camera_id, url, token)
+			self._sources[token] = source
+			self._by_camera[camera_id] = token
+		return source
+
+	def register_token(self, camera_id, token, rtsp_url=None):
+		"""Bind a fixed token, with the URL resolved later if not given."""
+		with self._lock:
+			self._by_camera[camera_id] = token
+			if rtsp_url:
+				self._sources[token] = _Source(camera_id, rtsp_url, token)
+			else:
+				self._sources.pop(token, None)
+		return self.url_for(camera_id)
+
+	def forget(self, camera_id):
+		"""Drop a cached URL so the next request resolves it again."""
+		with self._lock:
+			token = self._by_camera.get(camera_id)
+			if token:
+				self._sources.pop(token, None)
 
 	# -- streaming --------------------------------------------------------
 

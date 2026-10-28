@@ -115,6 +115,11 @@ def init_config():
 	# -- behaviour --------------------------------------------------------
 	# Takes over the remote's PiP key: short press keeps the box's own
 	# behaviour, long press drives the camera corner.
+	# A bouquet puts the cameras in the channel list, which is the only
+	# route anyone else in the house will use.
+	settings.bouquet = ConfigYesNo(default=False)
+	settings.bouquet_port = ConfigInteger(default=8098, limits=(1024, 65535))
+
 	settings.pip_key = ConfigYesNo(default=False)
 
 	# Motion, reported by Protect's Alarm Manager calling in. The token is
