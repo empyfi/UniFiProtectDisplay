@@ -4,6 +4,58 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [semantic versioning](https://semver.org/).
 
+## [0.7.0] - 2026-10-28
+
+The channel list is the part of this plugin anybody else in the house will
+use, so this release is about it being quick and about not having to press
+anything.
+
+### Added
+- **A "rotation" entry**: the cameras in turn, with nothing to press. It
+  works by changing channel on a timer, so the picture is the camera's own
+  video rather than anything re-encoded. The price is that each change is
+  a service restart, so a camera arrives after however long its stream
+  takes to open -- stated in the setting rather than discovered on the
+  sofa. Changing channel leaves it, like any other channel. Confirmed on a
+  receiver: handing over in 1.2s, stepping every fifteen seconds, and
+  stopping dead when the channel was changed by hand.
+- The grid and rotation entries can be switched on from the setup screen
+  and from `tools/configure.py` (`--bouquet-grid`, `--bouquet-rotate`).
+- The README has a section on the channel list, which it had never
+  described at all.
+
+### Fixed
+- **A camera channel took six to eleven seconds to show anything**, which
+  is long enough to read as a channel that does not work -- defeating the
+  point of having an offline card. Three separate causes, all measured on
+  a receiver, all now about 1.3 seconds:
+  - whether a camera was offline was decided only after asking Protect
+    where it streams from, so an unreachable camera paid for a round trip
+    that could not help it;
+  - the stored "connected" flag was never re-read, so a camera unplugged
+    since the last camera-list fetch still sent the channel off to remux a
+    stream that no longer existed;
+  - ffmpeg emits nothing until it has worked out what its input is, and at
+    two frames a second that inspection took five seconds of wall clock.
+- A stream that cannot be resolved, and a remux that produces not one
+  byte, now say so on screen instead of leaving the channel dead.
+- `tools/deploy.py` rebuilds when the sources are newer than the last
+  `.ipk`. It used to upload whatever was in `dist/`, so an edit made since
+  the last build never reached the box -- and the deploy reported success,
+  which is the worse of the two possible failures.
+
+### Changed
+- The grid no longer keeps a row it has nothing to put in. Two cameras --
+  the commonest installation there is -- sat across the top of a 2x2 with
+  the bottom half of the television black, which reads as a broken picture
+  rather than a sparse one. Each tile now keeps the shape of a camera
+  picture whether or not there is a picture for it, so an offline tile is
+  the same size as a live one, and the name sits on the picture instead of
+  floating below it.
+- The channel-list settings take effect on a bouquet that already exists,
+  instead of waiting for somebody to find the menu entry that rewrites the
+  file.
+
 ## [0.6.0] - 2026-10-28
 
 The channel list became the point of the plugin. Everything before this was

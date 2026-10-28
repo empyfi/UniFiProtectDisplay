@@ -8,5 +8,5 @@ is never written down in two places that can drift apart.
 """
 
 PLUGIN_NAME = "UniFi Protect Display"
-PLUGIN_VERSION = "0.6.0"
+PLUGIN_VERSION = "0.7.0"
 PLUGIN_PACKAGE = "enigma2-plugin-extensions-unifi-protect-display"

@@ -103,6 +103,49 @@ to fetch the cameras, and **OK** to select the ones you want. New cameras
 arrive switched off on purpose — adding a camera in Protect should not
 silently put it on your television.
 
+## In the channel list
+
+This is the part worth switching on. Everything else in the plugin is
+reached through the plugin browser, which is fine for whoever set the box up
+and too much for anybody else in the house. A bouquet is the most familiar
+thing a receiver has: press the channel list, pick **UniFi Protect**, page
+through the cameras. There is nothing to learn and nothing new to hold.
+
+Switch on *Put the cameras in the channel list* in setup, then write the
+bouquet from the plugin's own menu. Three kinds of entry can appear:
+
+- **one channel per camera**, numbered, because that is how a channel list
+  is read — and because Protect lets two cameras share a name, which they
+  often do straight out of the box;
+- **All cameras** — every selected camera at once as stills, laid out to
+  fill the frame and each tile labelled. Live video in a grid would need a
+  decoder per camera and an encoder the box does not have; stills need
+  neither, and for *is everything quiet* they are the better picture;
+- **Rotation** — the cameras in turn, with nothing to press. Real video,
+  because it works by changing channel on a timer rather than by
+  re-encoding anything. The cost is that every change is a service
+  restart, so each camera arrives after however long its stream takes to
+  open. Changing channel is how you leave it, like any other channel.
+
+A camera the console cannot reach plays a black card naming it and saying
+**OFFLINE**, rather than a channel that simply fails — somebody watching may
+have no other way to tell an unplugged camera from a broken plugin. The same
+goes for a console that cannot be reached at all.
+
+The entries are type 1 references pointing at a loopback proxy on a fixed
+port: Protect serves `rtsps://` with SRTP, which GStreamer's rtspsrc does not
+do, so the proxy remuxes RTSP into MPEG-TS over HTTP. Type 1 then reads it
+natively, which is also the only type Picture-in-Picture accepts.
+
+Everything here can be set over SSH instead:
+
+```bash
+python tools/configure.py <box-ip> --bouquet --bouquet-grid --bouquet-rotate
+python tools/configure.py <box-ip> --rotate-interval 20
+```
+
+## From the extensions menu
+
 From the extensions menu (usually the blue button):
 
 - **UniFi Protect: corner** — switch the corner on or off
