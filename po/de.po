@@ -594,3 +594,18 @@ msgstr "Alle Kameras"
 
 msgid "No cameras selected"
 msgstr "Keine Kameras ausgewählt"
+
+msgid "NO SIGNAL"
+msgstr "KEIN SIGNAL"
+
+msgid "Add an entry showing every camera"
+msgstr "Eintrag mit allen Kameras hinzufügen"
+
+msgid "One more channel with all the cameras at once, as stills. Live video in a grid would need a decoder per camera, which the box does not have."
+msgstr "Ein weiterer Kanal mit allen Kameras gleichzeitig, als Standbilder. Bewegtbild im Raster bräuchte einen Decoder je Kamera, den die Box nicht hat."
+
+msgid "Add an entry that rotates"
+msgstr "Eintrag mit Rotation hinzufügen"
+
+msgid "One more channel that plays the cameras in turn by changing channel, using the interval above. Real video, so each change takes as long as that camera needs to start. Changing channel leaves it."
+msgstr "Ein weiterer Kanal, der die Kameras nacheinander zeigt, indem er im eingestellten Abstand umschaltet. Echtes Bewegtbild, also dauert jeder Wechsel so lange, wie die Kamera zum Starten braucht. Umschalten beendet ihn."

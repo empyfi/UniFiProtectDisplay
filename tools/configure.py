@@ -71,6 +71,8 @@ SETTINGS = {
 	"pip_key": (BOOLEAN, False),
 	"skip_offline": (BOOLEAN, True),
 	"bouquet": (BOOLEAN, False),
+	"bouquet_grid": (BOOLEAN, True),
+	"bouquet_rotate": (BOOLEAN, False),
 	"bouquet_port": (PLAIN, "8098"),
 	"webhook": (BOOLEAN, False),
 	"webhook_port": (PLAIN, "8099"),
@@ -451,6 +453,17 @@ def build_parser():
 	channel.add_argument(
 		"--bouquet-port", dest="bouquet_port", type=int,
 		help="fixed port the bouquet entries point at (default 8098)")
+	channel.add_argument(
+		"--bouquet-grid", dest="bouquet_grid", action="store_true",
+		default=None, help="add an entry showing every camera at once")
+	channel.add_argument(
+		"--no-bouquet-grid", dest="bouquet_grid", action="store_false")
+	channel.add_argument(
+		"--bouquet-rotate", dest="bouquet_rotate", action="store_true",
+		default=None,
+		help="add an entry that plays the cameras in turn")
+	channel.add_argument(
+		"--no-bouquet-rotate", dest="bouquet_rotate", action="store_false")
 
 	behaviour = parser.add_argument_group("behaviour")
 	behaviour.add_argument(
@@ -480,6 +493,8 @@ def collect_overrides(args, api_key):
 		("plain_rtsp", "plain_rtsp"), ("autostart", "autostart"),
 		("corner_fit", "corner_fit"), ("pip_key", "pip_key"),
 		("bouquet", "bouquet"), ("bouquet_port", "bouquet_port"),
+		("bouquet_grid", "bouquet_grid"),
+		("bouquet_rotate", "bouquet_rotate"),
 		("webhook", "webhook"), ("webhook_port", "webhook_port"),
 		("motion_action", "motion_action"), ("motion_hold", "motion_hold"),
 		("debug", "debug"),

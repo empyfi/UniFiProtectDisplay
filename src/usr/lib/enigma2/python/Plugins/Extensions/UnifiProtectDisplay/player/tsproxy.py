@@ -43,6 +43,13 @@ PATH_PREFIX = "/cam/"
 # is every selected camera at once.
 GRID_PATH = "/grid"
 
+# So is rotation. Normally nothing plays here for more than an instant:
+# selecting it is what tells the plugin to start changing channel, and
+# it then changes channel away from here at once. What this serves is
+# the fallback for a plugin that is not running to hear about it,
+# which would otherwise be a channel that does nothing at all.
+ROTATE_PATH = "/rotate"
+
 # eHttpStream treats a handful of content types as playlists and then tries to
 # read a URL out of the body (lib/base/httpstream.cpp). video/mp2t is not one
 # of them, which is exactly what we need.
@@ -112,7 +119,8 @@ class TsProxy(object):
 
 	def __init__(self, ffmpeg_path="ffmpeg", port=0, log=None,
 			popen=None, args_builder=None, server_factory=None,
-			url_resolver=None, offline_card=None, grid_source=None):
+			url_resolver=None, offline_card=None, grid_source=None,
+			problem_card=None, rotate_source=None):
 		self.ffmpeg_path = ffmpeg_path
 		self.requested_port = port
 		self.port = None
@@ -129,10 +137,17 @@ class TsProxy(object):
 		# ahead with the remux. Keeps the proxy from needing to know what
 		# "offline" means.
 		self._offline_card = offline_card
+		# Returns a JPEG for a camera that should be streamable but is
+		# not -- a console that cannot be reached, a tier that will not
+		# enable. Without it those end as a dead channel.
+		self._problem_card = problem_card
 		# Returns a JPEG of all cameras, for the grid route.
 		self._grid_source = grid_source
+		# Returns a JPEG for the rotation route.
+		self._rotate_source = rotate_source
 		self._sources = {}  # token -> _Source
 		self._by_camera = {}  # camera_id -> token
+		self._camera_by_token = {}  # token -> camera_id, for the offline check
 		self._server = None
 		self._thread = None
 		self._lock = threading.Lock()
@@ -170,6 +185,7 @@ class TsProxy(object):
 		with self._lock:
 			self._sources.clear()
 			self._by_camera.clear()
+			self._camera_by_token.clear()
 		self._info("TS proxy stopped")
 
 	@property
@@ -192,6 +208,7 @@ class TsProxy(object):
 				# token_urlsafe, not the camera id: see the module docstring.
 				token = secrets.token_urlsafe(12)
 				self._by_camera[camera_id] = token
+			self._camera_by_token[token] = camera_id
 			self._sources[token] = _Source(camera_id, rtsp_url, token)
 		return self.url_for(camera_id)
 
@@ -221,17 +238,31 @@ class TsProxy(object):
 			source = _Source(camera_id, url, token)
 			self._sources[token] = source
 			self._by_camera[camera_id] = token
+			self._camera_by_token[token] = camera_id
 		return source
 
 	def register_token(self, camera_id, token, rtsp_url=None):
 		"""Bind a fixed token, with the URL resolved later if not given."""
 		with self._lock:
 			self._by_camera[camera_id] = token
+			self._camera_by_token[token] = camera_id
 			if rtsp_url:
 				self._sources[token] = _Source(camera_id, rtsp_url, token)
 			else:
 				self._sources.pop(token, None)
 		return self.url_for(camera_id)
+
+	def camera_for_token(self, token):
+		"""Which camera a token belongs to, without resolving its URL.
+
+		The cheap half of :meth:`source_for_token`: a dictionary lookup
+		against what was registered, no Protect request. That separation is
+		the point -- it lets the caller find out that a camera is offline
+		before paying for the round trip that would tell it where the
+		camera streams from.
+		"""
+		with self._lock:
+			return self._camera_by_token.get(token)
 
 	def forget(self, camera_id):
 		"""Drop a cached URL so the next request resolves it again."""
@@ -248,6 +279,12 @@ class TsProxy(object):
 			return None
 		return "http://%s:%d%s" % (BIND_HOST, self.port, GRID_PATH)
 
+	def rotate_url(self):
+		"""Loopback URL of the rotation entry, or None."""
+		if not self.running or self._rotate_source is None:
+			return None
+		return "http://%s:%d%s" % (BIND_HOST, self.port, ROTATE_PATH)
+
 	def stream_cards(self, frame_source, write, should_continue=None):
 		"""Serve a series of pictures as a transport stream.
 
@@ -258,7 +295,8 @@ class TsProxy(object):
 		"""
 		from .imagestream import ImageStreamer
 		streamer = ImageStreamer(
-			frame_source, ffmpeg_path=self.ffmpeg_path, log=self._log)
+			frame_source, ffmpeg_path=self.ffmpeg_path, log=self._log,
+			popen=self._popen)
 		return streamer.stream(write, should_continue)
 
 	def offline_frame(self, camera_id):
@@ -271,6 +309,16 @@ class TsProxy(object):
 			self._warn("could not render the offline card: %s", exc)
 			return None
 
+	def problem_frame(self, camera_id):
+		"""A card for a camera that cannot be streamed for another reason."""
+		if self._problem_card is None:
+			return None
+		try:
+			return self._problem_card(camera_id)
+		except Exception as exc:  # noqa: BLE001
+			self._warn("could not render the problem card: %s", exc)
+			return None
+
 	def grid_frame(self):
 		if self._grid_source is None:
 			return None
@@ -278,6 +326,15 @@ class TsProxy(object):
 			return self._grid_source()
 		except Exception as exc:  # noqa: BLE001
 			self._warn("could not render the grid: %s", exc)
+			return None
+
+	def rotate_frame(self):
+		if self._rotate_source is None:
+			return None
+		try:
+			return self._rotate_source()
+		except Exception as exc:  # noqa: BLE001
+			self._warn("could not render the rotation card: %s", exc)
 			return None
 
 	def stream(self, source, write, should_continue=None):
@@ -386,26 +443,46 @@ def _handler_for(proxy):
 
 		def do_GET(self):  # noqa: N802 - name fixed by BaseHTTPRequestHandler
 			path = self.path.split("?", 1)[0].rstrip("/") or "/"
-			if path == GRID_PATH:
-				if proxy.grid_frame() is None:
-					self.send_error(404, "No grid")
+			if path in (GRID_PATH, ROTATE_PATH):
+				source = (proxy.grid_frame if path == GRID_PATH
+					else proxy.rotate_frame)
+				if source() is None:
+					self.send_error(404, "Not available")
 					return
 				self._begin()
-				proxy.stream_cards(proxy.grid_frame, self.wfile.write)
+				proxy.stream_cards(source, self.wfile.write)
 				return
 			if not path.startswith(PATH_PREFIX):
 				self.send_error(404, "Not found")
 				return
 			token = path[len(PATH_PREFIX):]
+			# Ask whether the camera is offline *before* looking up where it
+			# streams from. That lookup is one or two Protect requests, and
+			# for a camera the console has already reported unreachable they
+			# are several seconds of black screen spent learning nothing --
+			# measured at six to eleven seconds on a real receiver, which is
+			# long enough to look like a channel that does not work.
+			camera_id = proxy.camera_for_token(token)
+			if camera_id is not None and proxy.offline_frame(camera_id) is not None:
+				self._info("camera %s is offline; serving a card", camera_id)
+				self._begin()
+				proxy.stream_cards(
+					lambda: proxy.offline_frame(camera_id), self.wfile.write)
+				return
 			source = proxy.source_for_token(token)
 			if source is None:
-				self.send_error(404, "Unknown stream")
+				# Nothing to play and the console did not say why. A card
+				# still beats a dead channel for whoever is watching.
+				if camera_id is None or proxy.problem_frame(camera_id) is None:
+					self.send_error(404, "Unknown stream")
+					return
+				self._info("no stream for camera %s; serving a card", camera_id)
+				self._begin()
+				proxy.stream_cards(
+					lambda: proxy.problem_frame(camera_id), self.wfile.write)
 				return
-			card = proxy.offline_frame(source.camera_id)
-			if card is not None:
-				# The camera cannot be streamed. Say so on screen rather
-				# than leaving the channel dead: whoever is watching may
-				# have no other way to tell the two apart.
+			# The console may have dropped the camera while we were asking.
+			if proxy.offline_frame(source.camera_id) is not None:
 				self._info("camera %s is offline; serving a card",
 					source.camera_id)
 				self._begin()
@@ -414,7 +491,21 @@ def _handler_for(proxy):
 					self.wfile.write)
 				return
 			self._begin()
-			proxy.stream(source, self.wfile.write)
+			if proxy.stream(source, self.wfile.write):
+				return
+			# ffmpeg produced not one byte: the camera has gone since the
+			# console last listed it, or the stream it named is refusing
+			# the connection. The response is already open, so the card
+			# goes into the same one and the channel ends up saying
+			# something instead of staying blank.
+			card = proxy.problem_frame(source.camera_id)
+			if card is None:
+				return
+			self._info("nothing came back for camera %s; serving a card",
+				source.camera_id)
+			proxy.stream_cards(
+				lambda: proxy.problem_frame(source.camera_id),
+				self.wfile.write)
 
 		def _info(self, message, *args):
 			if proxy._log is not None:

@@ -120,6 +120,10 @@ def session_start(reason, session=None, **kwargs):
 		manager.apply_key_binding()
 	manager.start_webhook()
 	manager.start_bouquet_proxy()
+	manager.start_zap_rotation()
+	# Settings may have been written from outside enigma2 -- by
+	# tools/configure.py, say -- while this was not running.
+	manager.sync_bouquet()
 
 	if not config.autostart.value or config.corner_mode.value == MODE_OFF:
 		return

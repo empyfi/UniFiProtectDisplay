@@ -34,6 +34,24 @@ from .localisation import _
 # seconds, which is as precise as "is it online" can usefully be.
 REFRESH_INTERVAL = 5.0
 
+# How old the stored connected flags may be before a channel in the
+# bouquet re-reads them before playing. Long enough that paging through
+# the cameras costs one request, short enough that a camera unplugged
+# this morning is not still "connected" tonight.
+CONNECTED_TTL = 30.0
+
+# How often the rotation channel checks whether the camera on screen
+# has had its turn. A second is far finer than any interval worth
+# setting, and the check is a comparison of two numbers.
+ZAP_TICK_MS = 1000
+
+# And how long to wait before actually changing channel. The decision
+# is taken inside enigma2's own service-started callback, and calling
+# playService() from in there is re-entering the thing that called us.
+# A one-shot timer puts the zap back on the main loop, where an
+# ordinary channel change happens.
+ZAP_DELAY_MS = 50
+
 # How often the grid refetches snapshots. One request per camera per frame
 # would hammer the console for a picture nobody is studying that closely.
 GRID_INTERVAL = 2.0
@@ -72,6 +90,12 @@ class DisplayManager(object):
 		self._bouquet_proxy = None
 		self._grid_cache = None
 		self._grid_fetched = 0.0
+		self._connected_checked = 0.0
+		self._zap_rotation = None
+		self._zap_hooked = False
+		self._zap_timer = None
+		self._zap_once = None
+		self._zap_target = None
 
 	@classmethod
 	def get(cls, session=None):
@@ -153,6 +177,8 @@ class DisplayManager(object):
 		self.start_webhook()
 		self.stop_bouquet_proxy()
 		self.start_bouquet_proxy()
+		self.start_zap_rotation()
+		self.sync_bouquet()
 
 		# Restart only what was already on screen. Saving settings is not a
 		# request to switch the corner on, and a corner appearing by itself
@@ -165,6 +191,9 @@ class DisplayManager(object):
 	def refresh_selection(self):
 		"""Pick up a change made in the camera list screen."""
 		self.rotation.set_cameras(self.store.enabled_ids())
+		# The rotation channel holds one reference per camera, so a
+		# changed selection makes its list wrong.
+		self.start_zap_rotation()
 
 	# -- the corner -------------------------------------------------------
 
@@ -297,7 +326,9 @@ class DisplayManager(object):
 		proxy = TsProxy(
 			ffmpeg_path=ffmpeg, port=config.bouquet_port.value,
 			log=self.log, url_resolver=self._resolve_token,
-			offline_card=self._offline_card, grid_source=self._grid_frame)
+			offline_card=self._offline_card, grid_source=self._grid_frame,
+			problem_card=self._problem_card,
+			rotate_source=self._rotate_frame)
 		try:
 			proxy.start()
 		except Exception as exc:  # noqa: BLE001
@@ -317,6 +348,7 @@ class DisplayManager(object):
 			self._bouquet_proxy = None
 		self._grid_cache = None
 		self._grid_fetched = 0.0
+		self._connected_checked = 0.0
 
 	def _resolve_token(self, token):
 		"""Look up a camera's stream when its bouquet entry is first played.
@@ -356,9 +388,68 @@ class DisplayManager(object):
 		from . import cards
 		if not cards.available():
 			return None
-		if self.store.is_connected(camera_id):
+		if self._connected_now(camera_id):
 			return None
 		return cards.offline_card(self.store.name_for(camera_id))
+
+	def _connected_now(self, camera_id):
+		"""Whether the console reaches this camera, from a recent answer.
+
+		The stored flag is written when the camera list is fetched, and on
+		a box nobody has opened the plugin on that may have been days ago.
+		A camera unplugged since then still reads as connected, so the
+		channel goes off to remux a stream that no longer exists, sits
+		black for eleven seconds and then fails -- measured on a receiver,
+		and from the sofa indistinguishable from a broken plugin.
+
+		Re-reading costs one request covering every camera, and it happens
+		on a proxy thread, where blocking holds up nothing except the
+		picture being decided on anyway.
+		"""
+		now = time.time()
+		if (now - self._connected_checked > CONNECTED_TTL
+				and self.api.is_configured()):
+			self._connected_checked = now
+			try:
+				self.store.merge(self.api.list_cameras())
+				self.store.save()
+			except Exception as exc:  # noqa: BLE001
+				# Keep the stored answer: a console that cannot be reached
+				# is handled further along, by the problem card.
+				self.log.debug("could not re-read the camera list: %s", exc)
+		return self.store.is_connected(camera_id)
+
+	def _problem_card(self, camera_id):
+		"""A card for a camera the console calls connected but will not serve.
+
+		An unreachable console and a quality tier that refuses to enable
+		both arrive here. Neither is the camera's fault and neither can be
+		explained on a television, so the card says only that there is no
+		picture -- which is at least the truth, and better than a channel
+		that sits black with nothing to read.
+		"""
+		from . import cards
+		if not cards.available():
+			return None
+		return cards.offline_card(
+			self.store.name_for(camera_id), message=_("NO SIGNAL"))
+
+	def _rotate_frame(self):
+		"""The picture behind the rotation entry.
+
+		Barely ever seen: selecting that channel is what starts the zap
+		hook, and the hook changes channel away from it within a tenth of
+		a second. It matters when the hook is not there -- the plugin not
+		running, or enigma2 refusing the callback -- and then this is the
+		difference between a channel that explains itself and a channel
+		that does nothing.
+		"""
+		from . import cards
+		if not cards.available():
+			return None
+		if self._rotation_entry() is None:
+			return None
+		return cards.message_card(_("Rotation"))
 
 	def _grid_frame(self):
 		"""One picture of every selected camera.
@@ -391,8 +482,14 @@ class DisplayManager(object):
 			self._grid_cache = cards.grid_card(tiles)
 		return self._grid_cache
 
-	def bouquet_entries(self):
-		"""``[(label, reference), ...]`` for the selected cameras."""
+	def camera_entries(self):
+		"""``[(camera_id, label, reference), ...]`` for the selected cameras.
+
+		One place builds these, because the rotation channel zaps to the
+		very references the bouquet file holds: built twice they would
+		drift, and a reference that differs by one character is a channel
+		that plays nothing with no sign of why.
+		"""
 		from . import bouquet as bouquet_module
 		from . import servicerefs
 		config = settings_module.get_config()
@@ -404,14 +501,181 @@ class DisplayManager(object):
 		for (camera_id, _name), label in zip(cameras, labels):
 			token = self.store.token_for(camera_id)
 			url = "http://127.0.0.1:%d/cam/%s" % (port, token)
-			entries.append((label, servicerefs.build_pip_reference(url, label)))
+			entries.append(
+				(camera_id, label, servicerefs.build_pip_reference(url, label)))
+		return entries
+
+	def _reference_for_camera(self, camera_id):
+		"""The bouquet reference of one camera's channel, or None."""
+		for entry_id, _label, reference in self.camera_entries():
+			if entry_id == camera_id:
+				return reference
+		return None
+
+	def _rotation_entry(self):
+		"""``(label, reference)`` for the rotation channel, or None.
+
+		Absent with fewer than two cameras: an entry that behaves exactly
+		like the one above it is clutter, and in a channel list clutter is
+		the whole problem.
+		"""
+		from . import servicerefs
+		from .player.tsproxy import ROTATE_PATH
+		config = settings_module.get_config()
+		if not config.bouquet_rotate.value:
+			return None
+		if len(self.store.enabled_ids()) < 2:
+			return None
+		label = _("Rotation")
+		url = "http://127.0.0.1:%d%s" % (config.bouquet_port.value, ROTATE_PATH)
+		return label, servicerefs.build_pip_reference(url, label)
+
+	def bouquet_entries(self):
+		"""``[(label, reference), ...]`` for the bouquet file."""
+		from . import servicerefs
+		config = settings_module.get_config()
+		port = config.bouquet_port.value
+		entries = [
+			(label, reference)
+			for _cid, label, reference in self.camera_entries()]
 		if entries and config.bouquet_grid.value:
 			# Last, so it does not come between the cameras when paging.
 			label = _("All cameras")
 			url = "http://127.0.0.1:%d/grid" % port
 			entries.append((label, servicerefs.build_pip_reference(url, label)))
+		rotation_entry = self._rotation_entry()
+		if entries and rotation_entry is not None:
+			entries.append(rotation_entry)
 		self.store.save()
 		return entries
+
+	# -- rotation as a channel --------------------------------------------
+
+	def start_zap_rotation(self):
+		"""Watch what the receiver plays, so the rotation channel works.
+
+		Everything that decides anything lives in :mod:`zaprotation`, which
+		knows nothing about enigma2. What is here is the two things only
+		enigma2 can do: say what is playing, and change it.
+		"""
+		from .zaprotation import ZapRotation
+		config = settings_module.get_config()
+		entry = self._rotation_entry()
+		if not config.bouquet.value or entry is None:
+			self.stop_zap_rotation()
+			return
+		self._zap_rotation = ZapRotation(
+			self.rotation, self._reference_for_camera,
+			entry_reference=entry[1],
+			interval=int(config.rotate_interval.value))
+		if self._zap_hooked:
+			return
+		try:
+			self.session.nav.event.append(self._service_started)
+		except Exception as exc:  # noqa: BLE001
+			self.log.error("could not watch what is playing: %s", exc)
+			self._zap_rotation = None
+			return
+		self._zap_hooked = True
+		self.log.info("rotation channel armed, every %ss",
+			config.rotate_interval.value)
+
+	def stop_zap_rotation(self):
+		"""Let go of the zap hook and the timer."""
+		self._zap_rotation = None
+		self._disarm_zap_timer()
+		if not self._zap_hooked:
+			return
+		try:
+			self.session.nav.event.remove(self._service_started)
+		except Exception as exc:  # noqa: BLE001
+			self.log.debug("could not unhook from zapping: %s", exc)
+		self._zap_hooked = False
+
+	def _service_started(self, event=None):
+		"""Called by enigma2 whenever it starts playing something."""
+		try:
+			from enigma import iPlayableService
+			if event is not None and event != iPlayableService.evStart:
+				return
+		except ImportError:  # pragma: no cover - only off the receiver
+			pass
+		zapper = self._zap_rotation
+		if zapper is None:
+			return
+		target = zapper.observe(self._playing_reference(), time.time())
+		if zapper.running:
+			self._arm_zap_timer()
+		else:
+			self._disarm_zap_timer()
+		if target:
+			self._zap_to(target)
+
+	def _playing_reference(self):
+		try:
+			service = self.session.nav.getCurrentlyPlayingServiceReference()
+		except Exception as exc:  # noqa: BLE001
+			self.log.debug("could not read what is playing: %s", exc)
+			return ""
+		return service.toString() if service else ""
+
+	def _zap_tick(self):
+		zapper = self._zap_rotation
+		if zapper is None or not zapper.running:
+			self._disarm_zap_timer()
+			return
+		target = zapper.tick(time.time())
+		if target:
+			self._zap_to(target)
+
+	def _arm_zap_timer(self):
+		if self._zap_timer is None:
+			self._zap_timer = eTimer()
+			self._zap_timer.callback.append(self._zap_tick)
+		self._zap_timer.start(ZAP_TICK_MS, False)
+
+	def _disarm_zap_timer(self):
+		if self._zap_timer is not None:
+			self._zap_timer.stop()
+
+	def _zap_to(self, reference):
+		"""Change channel, out of enigma2's own event callback."""
+		self._zap_target = reference
+		if self._zap_once is None:
+			self._zap_once = eTimer()
+			self._zap_once.callback.append(self._do_zap)
+		self._zap_once.start(ZAP_DELAY_MS, True)
+
+	def _do_zap(self):
+		reference, self._zap_target = self._zap_target, None
+		if not reference:
+			return
+		try:
+			from enigma import eServiceReference
+			self.session.nav.playService(eServiceReference(reference))
+		except Exception as exc:  # noqa: BLE001
+			self.log.error("could not change to the next camera: %s", exc)
+			if self._zap_rotation is not None:
+				self._zap_rotation.stop()
+			self._disarm_zap_timer()
+
+	def sync_bouquet(self):
+		"""Rewrite an existing bouquet so the settings are reflected in it.
+
+		Which entries the bouquet holds is a setting, so leaving the file
+		alone makes those settings look broken: switched on, nothing
+		happens, and the menu entry that would write the file is exactly
+		the thing in the plugin browser that this bouquet exists to spare
+		people. Only an existing bouquet is rewritten -- adjusting an
+		option is not a request to put the cameras in the channel list.
+		"""
+		import os
+		from . import bouquet as bouquet_module
+		if not settings_module.get_config().bouquet.value:
+			return
+		if not os.path.exists(bouquet_module.bouquet_path()):
+			return
+		self.write_bouquet()
 
 	def write_bouquet(self):
 		"""Create or refresh the bouquet. Returns ``(ok, message)``."""
@@ -434,6 +698,9 @@ class DisplayManager(object):
 			self.log.error("could not write the bouquet: %s", exc)
 			return False, _("Could not write the bouquet: %s") % exc
 		self._reload_bouquets()
+		# The rotation entry has just appeared or gone; either way the
+		# hook's idea of which reference means "rotate" is now stale.
+		self.start_zap_rotation()
 		self.log.info("bouquet written with %d camera(s)", len(entries))
 		return True, _("Bouquet created with %d camera(s).") % len(entries)
 

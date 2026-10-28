@@ -123,6 +123,10 @@ def init_config():
 	# a grid would need a decoder per camera and an encoder the box does
 	# not have; stills need neither.
 	settings.bouquet_grid = ConfigYesNo(default=True)
+	# And one that plays the cameras in turn, by changing channel on a
+	# timer. Real video, unlike the grid, at the price of a service
+	# restart per camera -- see the zaprotation module.
+	settings.bouquet_rotate = ConfigYesNo(default=False)
 
 	settings.pip_key = ConfigYesNo(default=False)
 

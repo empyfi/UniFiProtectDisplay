@@ -187,6 +187,15 @@ class UnifiProtectSetup(ConfigListScreen, Screen):
 				_("Creates a bouquet so the cameras can be watched like "
 					"ordinary channels, with the remote everyone already "
 					"uses. Create it from the plugin menu afterwards.")),
+			(_("Add an entry showing every camera"), cfg.bouquet_grid,
+				_("One more channel with all the cameras at once, as "
+					"stills. Live video in a grid would need a decoder "
+					"per camera, which the box does not have.")),
+			(_("Add an entry that rotates"), cfg.bouquet_rotate,
+				_("One more channel that plays the cameras in turn by "
+					"changing channel, using the interval above. Real "
+					"video, so each change takes as long as that camera "
+					"needs to start. Changing channel leaves it.")),
 			_divider(_("Other")),
 			(_("Use the PiP key for the camera"), cfg.pip_key,
 				_("Long press shows the camera corner, and again steps to "

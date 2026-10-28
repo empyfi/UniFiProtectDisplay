@@ -26,6 +26,18 @@ DEFAULT_FRAMERATE = 2
 # Bounded so a slow consumer cannot make this grow without limit.
 PIPE_CHUNK = 188 * 350
 
+# How many copies of the first picture go in before pacing starts.
+#
+# ffmpeg emits nothing at all until it has worked out what the input
+# is, and it works that out by reading frames. At two frames a second
+# that inspection takes seconds of wall clock, all of it black screen:
+# measured on a receiver at 5.7s before the first byte, against 1.0s
+# with these frames up front and the probe limits below. The cost is
+# that the stream then runs about two seconds behind -- which on a
+# channel of stills nobody can see, and a channel that takes six
+# seconds to show anything everybody can.
+PRIME_FRAMES = 4
+
 
 def ffmpeg_args(ffmpeg="ffmpeg", framerate=DEFAULT_FRAMERATE, bitrate="1200k"):
 	"""Command line turning JPEGs on stdin into MPEG-TS on stdout.
@@ -33,13 +45,19 @@ def ffmpeg_args(ffmpeg="ffmpeg", framerate=DEFAULT_FRAMERATE, bitrate="1200k"):
 	``-tune stillimage`` and a short GOP keep a zap from waiting on a
 	keyframe: the decoder needs one before it can show anything, and with a
 	long GOP that wait is exactly the "channel does not work" the grid is
-	meant to avoid.
+	meant to avoid. The probe limits are there for the same reason, at the
+	other end of the pipe -- see :data:`PRIME_FRAMES`.
 	"""
 	return [
 		ffmpeg,
 		"-hide_banner",
 		"-loglevel", "error",
 		"-f", "image2pipe",
+		# Stop inspecting the input early. The default is five seconds of
+		# stream time, and there is nothing to discover here: every frame
+		# is a JPEG of the same size that this module just produced.
+		"-analyzeduration", "200000",
+		"-probesize", "100000",
 		"-framerate", str(framerate),
 		"-i", "-",
 		"-c:v", "libx264",
@@ -109,6 +127,7 @@ class ImageStreamer(object):
 		"""Write one JPEG per frame interval until told to stop."""
 		interval = 1.0 / float(max(1, self._framerate))
 		last = None
+		primed = False
 		try:
 			while not stop.is_set():
 				try:
@@ -123,8 +142,15 @@ class ImageStreamer(object):
 					# pipe, which ffmpeg would treat as end of input.
 					stop.wait(interval)
 					continue
+				# The first picture goes in several times, back to back, so
+				# ffmpeg can identify the input immediately. The copies are
+				# of the frame already in hand: asking the source again
+				# would mean a snapshot request per copy.
+				copies = PRIME_FRAMES if not primed else 1
+				primed = True
 				try:
-					process.stdin.write(last)
+					for _ in range(copies):
+						process.stdin.write(last)
 					process.stdin.flush()
 				except (IOError, OSError, ValueError):
 					break

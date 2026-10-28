@@ -26,6 +26,9 @@ class FakeProcess:
 	def __init__(self, payload=b"", stderr=b""):
 		self.stdout = io.BytesIO(payload)
 		self.stderr = io.BytesIO(stderr)
+		# The card streamer feeds JPEGs in on stdin, so the stand-in
+		# needs one too or it is not standing in for the same thing.
+		self.stdin = io.BytesIO()
 		self.terminated = False
 		self.killed = False
 		self._returncode = None
@@ -299,6 +302,192 @@ class TestHttpContract:
 	def test_other_paths_are_404(self, proxy):
 		response = self.raw_get(proxy.port, "/")
 		assert b" 404 " in response.split(b"\r\n", 1)[0]
+
+
+class TestOfflineComesFirst:
+	"""An offline camera must not cost a Protect round trip to discover.
+
+	Measured on a receiver before this was separated: zapping to a camera
+	the console had already reported unreachable sat black for six to
+	eleven seconds -- the time spent asking Protect for a stream URL that
+	was never going to work -- and only then showed the card. Long enough
+	that the channel reads as broken, which is the one thing the card is
+	there to prevent.
+	"""
+
+	CARD = b"\xff\xd8card"
+
+	@staticmethod
+	def make(popen, **kwargs):
+		proxy = TsProxy(
+			popen=popen, args_builder=lambda url, ffmpeg: ["x"], **kwargs)
+		proxy.start()
+		return proxy
+
+	@staticmethod
+	def status(response):
+		return response.split(b"\r\n", 1)[0]
+
+	@staticmethod
+	def body(response):
+		return response.split(b"\r\n\r\n", 1)[1]
+
+	def test_camera_for_token_resolves_without_the_api(self):
+		calls = []
+		proxy = self.make(
+			FakePopen(payload=b"ts"),
+			url_resolver=lambda token: calls.append(token))
+		try:
+			proxy.register_token("cam1", "tok1")
+			assert proxy.camera_for_token("tok1") == "cam1"
+			assert calls == []
+		finally:
+			proxy.stop()
+
+	def test_camera_for_an_unknown_token_is_none(self):
+		proxy = self.make(FakePopen(payload=b"ts"))
+		try:
+			assert proxy.camera_for_token("nope") is None
+		finally:
+			proxy.stop()
+
+	def test_stop_forgets_the_token_mapping_too(self):
+		proxy = self.make(FakePopen(payload=b"ts"))
+		proxy.register_token("cam1", "tok1")
+		proxy.stop()
+		assert proxy.camera_for_token("tok1") is None
+
+	def test_an_offline_camera_is_never_resolved(self):
+		resolved = []
+		proxy = self.make(
+			FakePopen(payload=b"ts"),
+			url_resolver=lambda token: resolved.append(token) or (
+				"cam1", RTSP_URL),
+			offline_card=lambda camera_id: self.CARD)
+		try:
+			proxy.register_token("cam1", "tok1")
+			response = TestHttpContract.raw_get(proxy.port, "/cam/tok1")
+			assert b" 200 " in self.status(response)
+			assert resolved == []
+		finally:
+			proxy.stop()
+
+	def test_a_connected_camera_is_still_resolved(self):
+		resolved = []
+		proxy = self.make(
+			FakePopen(payload=b"ts-data"),
+			url_resolver=lambda token: resolved.append(token) or (
+				"cam1", RTSP_URL),
+			offline_card=lambda camera_id: None)
+		try:
+			proxy.register_token("cam1", "tok1")
+			response = TestHttpContract.raw_get(proxy.port, "/cam/tok1")
+			assert self.body(response) == b"ts-data"
+			assert resolved == ["tok1"]
+		finally:
+			proxy.stop()
+
+	def test_a_camera_that_goes_offline_during_the_lookup_gets_a_card(self):
+		# The console can drop a camera between the two checks. Rare, but
+		# the second check costs nothing and the failure mode it prevents
+		# is a dead channel.
+		#
+		# Both paths end at the same fake process, so the payload says
+		# nothing; the command line does. A remux is the args_builder
+		# injected above, a card is the encoder in player.imagestream.
+		states = iter([None, self.CARD])
+		popen = FakePopen(payload=b"ts-data")
+		proxy = self.make(
+			popen,
+			url_resolver=lambda token: ("cam1", RTSP_URL),
+			offline_card=lambda camera_id: next(states, self.CARD))
+		try:
+			proxy.register_token("cam1", "tok1")
+			TestHttpContract.raw_get(proxy.port, "/cam/tok1")
+			assert popen.calls, "nothing was started at all"
+			started = popen.calls[-1]["args"]
+			assert "libx264" in started
+			assert started != ["x"]
+		finally:
+			proxy.stop()
+
+	def test_a_connected_camera_runs_the_remux_not_the_encoder(self):
+		# The other side of the same coin: a camera that is up must not be
+		# quietly turned into a slideshow.
+		popen = FakePopen(payload=b"ts-data")
+		proxy = self.make(
+			popen,
+			url_resolver=lambda token: ("cam1", RTSP_URL),
+			offline_card=lambda camera_id: None)
+		try:
+			proxy.register_token("cam1", "tok1")
+			TestHttpContract.raw_get(proxy.port, "/cam/tok1")
+			assert popen.calls[-1]["args"] == ["x"]
+		finally:
+			proxy.stop()
+
+	def test_a_stream_that_cannot_be_resolved_still_plays_something(self):
+		# An unreachable console, or a tier that will not enable. Without a
+		# card this is a 404, which enigma2 shows as a channel that simply
+		# does nothing.
+		proxy = self.make(
+			FakePopen(payload=b"ts"),
+			url_resolver=lambda token: None,
+			offline_card=lambda camera_id: None,
+			problem_card=lambda camera_id: self.CARD)
+		try:
+			proxy.register_token("cam1", "tok1")
+			response = TestHttpContract.raw_get(proxy.port, "/cam/tok1")
+			assert b" 200 " in self.status(response)
+		finally:
+			proxy.stop()
+
+	def test_a_remux_that_produces_nothing_falls_back_to_a_card(self):
+		# The console listed the camera, the URL resolved, and ffmpeg then
+		# read not one byte -- a camera gone since the list was taken. The
+		# response is already open by then, so the card has to go into the
+		# same one or the channel stays blank.
+		popen = FakePopen(payload=b"")
+		proxy = self.make(
+			popen,
+			url_resolver=lambda token: ("cam1", RTSP_URL),
+			offline_card=lambda camera_id: None,
+			problem_card=lambda camera_id: self.CARD)
+		try:
+			proxy.register_token("cam1", "tok1")
+			TestHttpContract.raw_get(proxy.port, "/cam/tok1")
+			started = [call["args"] for call in popen.calls]
+			assert started[0] == ["x"], "the remux should be tried first"
+			assert any("libx264" in args for args in started[1:]), (
+				"nothing fell back to a card")
+		finally:
+			proxy.stop()
+
+	def test_a_remux_that_produces_nothing_and_has_no_card_just_ends(self):
+		popen = FakePopen(payload=b"")
+		proxy = self.make(
+			popen,
+			url_resolver=lambda token: ("cam1", RTSP_URL),
+			offline_card=lambda camera_id: None)
+		try:
+			proxy.register_token("cam1", "tok1")
+			response = TestHttpContract.raw_get(proxy.port, "/cam/tok1")
+			assert b" 200 " in self.status(response)
+			assert [call["args"] for call in popen.calls] == [["x"]]
+		finally:
+			proxy.stop()
+
+	def test_without_a_problem_card_it_is_still_a_404(self):
+		proxy = self.make(
+			FakePopen(payload=b"ts"),
+			url_resolver=lambda token: None,
+			offline_card=lambda camera_id: None)
+		try:
+			proxy.register_token("cam1", "tok1")
+			response = TestHttpContract.raw_get(proxy.port, "/cam/tok1")
+			assert b" 404 " in self.status(response)
+		finally:
+			proxy.stop()
 
 
 class TestBinding:
