@@ -21,6 +21,7 @@ have. A grid of stills needs neither, updates about once a second, and for
 """
 
 import io
+import math
 
 try:  # pragma: no cover - present on the receiver and on the workstation
 	from PIL import Image, ImageDraw, ImageFont
@@ -35,6 +36,10 @@ TEXT = (235, 238, 242)
 MUTED = (150, 156, 164)
 OFFLINE_TINT = (40, 16, 16)
 JPEG_QUALITY = 82
+
+# What shape a tile is assumed to be when there is no picture to measure.
+# Every UniFi camera this plugin has met is 16:9.
+TILE_ASPECT = 16.0 / 9.0
 
 
 def available():
@@ -66,7 +71,7 @@ def _font(size):
 		return ImageFont.load_default()
 
 
-def _centre(draw, text, font, box):
+def _centre(draw, text, font, box, fill=TEXT):
 	"""Draw ``text`` centred in ``box`` = (x, y, width, height)."""
 	x, y, width, height = box
 	try:
@@ -78,7 +83,7 @@ def _centre(draw, text, font, box):
 	draw.text(
 		(x + (width - text_width) // 2 - left,
 			y + (height - text_height) // 2 - top),
-		text, font=font, fill=TEXT)
+		text, font=font, fill=fill)
 
 
 def _encode(image):
@@ -101,9 +106,10 @@ def offline_card(name="", size=DEFAULT_SIZE, message="OFFLINE"):
 	_centre(draw, message, _font(max(28, height // 8)),
 		(0, int(height * 0.32), width, int(height * 0.2)))
 	if name:
-		draw.text((0, 0), "", fill=MUTED)  # keep MUTED referenced for clarity
+		# Dimmer than the word OFFLINE: which camera it is matters less
+		# than the fact that it is down.
 		_centre(draw, name, _font(max(18, height // 18)),
-			(0, int(height * 0.54), width, int(height * 0.12)))
+			(0, int(height * 0.54), width, int(height * 0.12)), fill=MUTED)
 	return _encode(image)
 
 
@@ -122,21 +128,33 @@ def message_card(text, size=DEFAULT_SIZE):
 def grid_layout(count):
 	"""Columns and rows for ``count`` cameras.
 
-	Square-ish and growing in the familiar steps -- 2x2, 3x3, 4x4 -- so the
-	tiles stay as large as they can be. One camera fills the frame rather
-	than sitting alone in a corner.
+	The columns come from the square root and the rows follow from the
+	count, so the grid is as square as it can be without keeping a row it
+	has nothing to put in. Two cameras in a 2x2 sit across the top with the
+	bottom half black, which reads as a broken picture rather than a sparse
+	one -- and two cameras is the commonest installation there is.
 	"""
 	if count <= 1:
 		return 1, 1
-	if count <= 4:
-		return 2, 2
-	if count <= 9:
-		return 3, 3
-	if count <= 16:
-		return 4, 4
-	columns = 5
-	rows = (count + columns - 1) // columns
+	columns = int(math.ceil(math.sqrt(count)))
+	rows = int(math.ceil(count / float(columns)))
 	return columns, rows
+
+
+def _tile_rect(x, y, cell_width, cell_height, aspect=TILE_ASPECT):
+	"""The box a tile occupies inside its cell: ``aspect``, centred.
+
+	A camera still and an offline tile both use it, so one live camera
+	beside one dead one gives two boxes of the same size instead of a
+	letterboxed picture next to a full-height block of colour.
+	"""
+	width = cell_width
+	height = int(round(width / aspect))
+	if height > cell_height:
+		height = cell_height
+		width = int(round(height * aspect))
+	return (x + (cell_width - width) // 2, y + (cell_height - height) // 2,
+		width, height)
 
 
 def grid_card(tiles, size=DEFAULT_SIZE, gap=4):
@@ -155,34 +173,50 @@ def grid_card(tiles, size=DEFAULT_SIZE, gap=4):
 
 	cell_width = (width - gap * (columns + 1)) // columns
 	cell_height = (height - gap * (rows + 1)) // rows
-	label_font = _font(max(12, cell_height // 10))
+	# Sized from the tile rather than the cell: in a wide-cell layout the
+	# cell is much taller than the picture in it, and a font scaled to the
+	# cell would dwarf the camera.
+	label_font = _font(max(12, _tile_rect(0, 0, cell_width, cell_height)[3] // 10))
 
 	for index, (name, data) in enumerate(tiles):
 		column, row = index % columns, index // columns
-		x = gap + column * (cell_width + gap)
+		# A last row with gaps in it is centred, so three cameras are a row
+		# of two above one in the middle, not one hanging off to the left.
+		in_row = min(columns, len(tiles) - row * columns)
+		indent = (columns - in_row) * (cell_width + gap) // 2
+		x = gap + indent + column * (cell_width + gap)
 		y = gap + row * (cell_height + gap)
+
+		picture = None
 		if data:
 			try:
-				tile = Image.open(io.BytesIO(data))
-				tile = tile.convert("RGB")
-				tile = _fit(tile, cell_width, cell_height)
-				image.paste(tile, (x + (cell_width - tile.width) // 2,
-					y + (cell_height - tile.height) // 2))
+				picture = _fit(Image.open(io.BytesIO(data)).convert("RGB"),
+					cell_width, cell_height)
 			except Exception:  # noqa: BLE001
-				data = None
-		if not data:
+				picture = None
+		if picture is not None:
+			tile_x = x + (cell_width - picture.width) // 2
+			tile_y = y + (cell_height - picture.height) // 2
+			tile_width, tile_height = picture.width, picture.height
+			image.paste(picture, (tile_x, tile_y))
+		else:
+			tile_x, tile_y, tile_width, tile_height = _tile_rect(
+				x, y, cell_width, cell_height)
 			draw.rectangle(
-				[x, y, x + cell_width, y + cell_height], fill=OFFLINE_TINT)
+				[tile_x, tile_y, tile_x + tile_width, tile_y + tile_height],
+				fill=OFFLINE_TINT)
 			_centre(draw, "OFFLINE", label_font,
-				(x, y, cell_width, cell_height))
-		# The name goes on a band at the bottom of the tile, which stays
-		# readable whatever the picture behind it happens to be.
-		band = max(16, cell_height // 8)
+				(tile_x, tile_y, tile_width, tile_height))
+		# The name goes on a band along the bottom of the picture -- of the
+		# picture, not of the cell, or it floats in black somewhere below a
+		# letterboxed tile with nothing to attach it to.
+		band = max(16, tile_height // 8)
 		draw.rectangle(
-			[x, y + cell_height - band, x + cell_width, y + cell_height],
+			[tile_x, tile_y + tile_height - band,
+				tile_x + tile_width, tile_y + tile_height],
 			fill=(0, 0, 0))
 		_centre(draw, name or "", label_font,
-			(x, y + cell_height - band, cell_width, band))
+			(tile_x, tile_y + tile_height - band, tile_width, band))
 	return _encode(image)
 
 

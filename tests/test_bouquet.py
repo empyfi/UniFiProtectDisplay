@@ -157,20 +157,37 @@ class TestGridLayout:
 		# A single camera alone in a corner of a 2x2 grid would be absurd.
 		assert cards.grid_layout(1) == (1, 1)
 
-	def test_up_to_four_is_two_by_two(self):
+	def test_two_cameras_use_one_row(self):
 		from UnifiProtectDisplay import cards
-		for count in (2, 3, 4):
-			assert cards.grid_layout(count) == (2, 2)
+		# The commonest installation there is. In a 2x2 both cameras sit
+		# across the top and the bottom half of the television is black.
+		assert cards.grid_layout(2) == (2, 1)
 
-	def test_up_to_nine_is_three_by_three(self):
+	def test_three_and_four_are_two_by_two(self):
 		from UnifiProtectDisplay import cards
-		assert cards.grid_layout(5) == (3, 3)
+		assert cards.grid_layout(3) == (2, 2)
+		assert cards.grid_layout(4) == (2, 2)
+
+	def test_a_row_is_never_kept_empty(self):
+		from UnifiProtectDisplay import cards
+		# Five and six fit in three columns and two rows; a third row would
+		# shrink every tile to hold nothing.
+		assert cards.grid_layout(5) == (3, 2)
+		assert cards.grid_layout(6) == (3, 2)
+		assert cards.grid_layout(10) == (4, 3)
+
+	def test_full_squares_stay_square(self):
+		from UnifiProtectDisplay import cards
 		assert cards.grid_layout(9) == (3, 3)
-
-	def test_up_to_sixteen_is_four_by_four(self):
-		from UnifiProtectDisplay import cards
-		assert cards.grid_layout(10) == (4, 4)
 		assert cards.grid_layout(16) == (4, 4)
+
+	@pytest.mark.parametrize("count", list(range(1, 26)))
+	def test_every_camera_gets_a_cell(self, count):
+		from UnifiProtectDisplay import cards
+		columns, rows = cards.grid_layout(count)
+		assert columns * rows >= count
+		# ... and not a whole row more than needed.
+		assert columns * (rows - 1) < count
 
 	def test_more_than_sixteen_still_fits(self):
 		from UnifiProtectDisplay import cards
@@ -188,6 +205,23 @@ class TestCards:
 			_pytest.skip("PIL not installed")
 		data = cards.offline_card("Cam 2")
 		assert data[:2] == b"\xff\xd8"  # JPEG magic
+
+	def test_a_tile_keeps_the_shape_of_a_camera_picture(self):
+		from UnifiProtectDisplay import cards
+		# A cell can be far taller than 16:9 -- two cameras side by side
+		# get half the width and the full height. The tile inside it must
+		# still be camera-shaped, or an offline card is a tall slab next
+		# to a letterboxed neighbour.
+		_x, _y, width, height = cards._tile_rect(0, 0, 640, 720)
+		assert width == 640
+		assert abs(width / float(height) - 16.0 / 9.0) < 0.02
+
+	def test_a_tile_never_leaves_its_cell(self):
+		from UnifiProtectDisplay import cards
+		for cell in ((640, 720), (426, 240), (1280, 100), (300, 300)):
+			x, y, width, height = cards._tile_rect(7, 11, *cell)
+			assert width <= cell[0] and height <= cell[1]
+			assert x >= 7 and y >= 11
 
 	def test_grid_renders_with_a_missing_tile(self):
 		# One unreachable camera must not blank the grid or shift the rest.
