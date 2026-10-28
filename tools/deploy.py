@@ -76,10 +76,47 @@ def newest_ipk():
 	return max(candidates, key=os.path.getmtime) if candidates else None
 
 
+# Everything that ends up inside the package. Checked against the .ipk so an
+# edit made since the last build cannot be left behind.
+BUILD_INPUTS = ("src", "po", "CONTROL", "build.py")
+
+
+def sources_changed_since(package):
+	"""Whether anything the package is built from is newer than it.
+
+	Without this an existing .ipk is uploaded as it stands, so work done
+	since the last build never reaches the box -- and the deploy reports
+	success, which is the worst possible combination. It cost an afternoon
+	once; it costs a directory walk now.
+	"""
+	try:
+		built = os.path.getmtime(package)
+	except OSError:
+		return True
+	for name in BUILD_INPUTS:
+		target = os.path.join(ROOT, name)
+		if os.path.isfile(target):
+			if os.path.getmtime(target) > built:
+				return True
+			continue
+		for directory, subdirs, files in os.walk(target):
+			# Compiled leftovers are not inputs and are regenerated at
+			# random moments, so they would report a change every time.
+			subdirs[:] = [item for item in subdirs if item != "__pycache__"]
+			for entry in files:
+				if entry.endswith(".pyc"):
+					continue
+				if os.path.getmtime(os.path.join(directory, entry)) > built:
+					return True
+	return False
+
+
 def build_if_needed(force=False):
 	existing = newest_ipk()
-	if existing and not force:
+	if existing and not force and not sources_changed_since(existing):
 		return existing
+	if existing and not force:
+		log("the sources are newer than the last build; rebuilding")
 	log("building the package...")
 	subprocess.check_call([sys.executable, os.path.join(ROOT, "build.py")])
 	built = newest_ipk()
