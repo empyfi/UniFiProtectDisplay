@@ -4,6 +4,55 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [semantic versioning](https://semver.org/).
 
+## [0.6.0] - 2026-10-28
+
+The channel list became the point of the plugin. Everything before this was
+reached through the plugin browser, which is fine for whoever set the box up
+and too much for anybody else in the house.
+
+### Added
+- **A bouquet.** The cameras appear in the channel list as ordinary
+  channels, numbered, reachable with the remote everyone already uses. The
+  entries are type 1 references pointing at a loopback proxy on a fixed
+  port, because Protect serves rtsps:// with SRTP and GStreamer's rtspsrc
+  does not do SRTP. Confirmed playing on a receiver.
+- **An "all cameras" entry**: every selected camera at once as stills, laid
+  out 2x2, 3x3 or 4x4 as the count requires, each tile labelled.
+- **An offline card.** A camera the console cannot reach serves a black
+  frame naming it and saying so, rather than a channel that simply fails -
+  whoever is watching may have no way to tell an unplugged camera from a
+  broken plugin.
+- **Motion.** Protect's Alarm Manager calls the receiver when a camera sees
+  movement, and that camera is brought up. The Protect API cannot report
+  motion itself: no events endpoint, a silent event WebSocket, and the
+  private API rejects an API key. A learn route records what Protect sends,
+  for working out whether one URL could replace the per-camera ones.
+- The remote's **PiP key** drives the camera corner: long press shows it and
+  steps to the next camera, short press keeps the box's own
+  Picture-in-Picture and switches everything off.
+- The plugin's **own menu** in the plugin browser, and a screen showing the
+  webhook addresses to paste into Protect.
+- `tools/configure.py` sets the plugin up over SSH, including the API key
+  and camera selection, from a real keyboard.
+
+### Changed
+- Offline cameras keep their place and are labelled instead of being
+  skipped. Hiding them conceals that a camera exists and is down, which is
+  the opposite of what a surveillance display is for.
+- The corner takes its position and size from the box's own PiP window, so
+  arranging Picture-in-Picture once arranges both.
+
+### Fixed
+- The corner stayed black because ffmpeg never started: the RTSP demuxer in
+  these images rejects `-rw_timeout` and exits before reading a byte.
+- Only the video stream is taken. A UniFi camera offers two audio tracks,
+  one of them Opus, which MPEG-TS cannot carry.
+- Fullscreen played nothing, because GStreamer's rtspsrc does not do SRTP.
+- The corner no longer overwrites `config.av.pip`, the user's own
+  Picture-in-Picture geometry.
+- The plugin keeps its own log: enigma2's stdout goes to `/dev/console` on
+  this image, so `print` output reaches no file at all.
+
 ## [0.2.3] - 2026-10-14
 
 Everything below was found on a real receiver (GigaBlue UHD Quad 4K Pro,
