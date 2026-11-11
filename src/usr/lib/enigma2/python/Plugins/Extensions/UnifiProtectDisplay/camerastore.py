@@ -31,6 +31,8 @@ class CameraStore(object):
 		self._reader = reader or _read_file
 		self._writer = writer or _write_file_atomic
 		self._log = log
+		# What the file is known to hold, so an unchanged save is a no-op.
+		self._written = None
 		self._entries = []  # ordered list of dicts: id, name, enabled
 
 	# -- loading and saving -----------------------------------------------
@@ -59,10 +61,21 @@ class CameraStore(object):
 					self._entries.append(entry)
 		return self
 
-	def save(self):
-		"""Write the file atomically. Returns True on success."""
+	def save(self, force=False):
+		"""Write the file atomically. Returns True on success.
+
+		Content that has not changed is not written. The connection check
+		re-reads the camera list every few seconds while an OFFLINE card
+		is on screen and merges the answer, and this file lives in flash,
+		so a save per check would be thousands of needless writes for a
+		channel somebody left on.
+		"""
+		payload = json.dumps(self._entries, indent=1)
+		if not force and payload == self._written:
+			return True
 		try:
-			self._writer(self.path, json.dumps(self._entries, indent=1))
+			self._writer(self.path, payload)
+			self._written = payload
 			return True
 		except (OSError, IOError) as exc:
 			self._warn("could not save the camera list: %s", exc)

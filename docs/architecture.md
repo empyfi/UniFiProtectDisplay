@@ -57,7 +57,7 @@ is available.
   protect/api    camerastore     rotation       capabilities    bouquet.py
   protect/models  geometry        async_util     servicerefs     cards.py
   settings.py     logger.py       zaprotation    slideshow       buttonbinding
-  motionpolicy
+  motionpolicy    cardretry
 ```
 
 `player/tsproxy.py` straddles the line: it imports no enigma2 and is tested
@@ -265,6 +265,19 @@ always, the grid re-reads it as it draws, and the rotation channel keeps the
 list current in the background for as long as it is running. The store logs
 a camera changing state, because that is the line every "it did not notice"
 question is answered by.
+
+Being fresh is not the same as being noticed, which is the part that
+caught me out. A channel start decided once, when the connection opened,
+and then the card played for as long as the viewer stayed -- so the one
+person this matters to, somebody who zapped to an offline camera and
+waited for it to come back, waited in vain however fresh the flags were.
+The card route now keeps asking while it plays and ends when the camera
+returns; because a stream that stops is a channel that stops, the plugin
+is told and opens the channel again. `cardretry.py` holds the one decision
+that needs taking there: how often the same channel may do that, because a
+camera on a bad connection would otherwise restart the channel every few
+seconds, and every restart is a black screen for as long as a stream takes
+to open.
 
 The hold is the older and separate idea: it keeps automatic rotation from
 sliding off a camera motion has just brought up. Its length is the user's

@@ -19,6 +19,7 @@ from enigma import eTimer
 from . import settings as settings_module
 from .async_util import TaskRunner
 from .camerastore import CameraStore
+from .cardretry import RetryGate
 from .capabilities import Capabilities
 from .controller import Controller
 from .logger import Logger
@@ -36,6 +37,20 @@ from .localisation import _
 # that has come back still plays an OFFLINE card. The floor is only there
 # to keep several routes opening together from asking several times.
 CHANNEL_START_TTL = 2.0
+
+# How fresh the answer has to be while an OFFLINE card is actually on
+# screen. Somebody is looking at it and waiting, so a few seconds; one
+# request covering every camera is a small price for that.
+CARD_RECHECK_TTL = 5.0
+
+# How long after a camera comes back before its channel is opened again,
+# and how long before the same camera may do that a second time. The
+# first is only to let enigma2 finish ending the stream that just
+# stopped; the second keeps a camera on a bad connection from restarting
+# the channel over and over, each restart being a black screen for as
+# long as a stream takes to open.
+CARD_RETRY_MS = 300
+CARD_RETRY_INTERVAL = 20.0
 
 # How often the camera list may be re-fetched while switching around.
 # Without a floor, holding the next-camera button would fire one request per
@@ -98,6 +113,9 @@ class DisplayManager(object):
 		self._grid_fetched = 0.0
 		self._connected_checked = 0.0
 		self._slides = None
+		self._card_retry = RetryGate(interval=CARD_RETRY_INTERVAL)
+		self._retry_timer = None
+		self._retry_target = None
 		self._stills_interval = float(config.snapshot_interval.value)
 		self._zap_rotation = None
 		self._zap_hooked = False
@@ -344,6 +362,8 @@ class DisplayManager(object):
 			ffmpeg_path=ffmpeg, port=config.bouquet_port.value,
 			log=self.log, url_resolver=self._resolve_token,
 			offline_card=self._offline_card, grid_source=self._grid_frame,
+			offline_check=self._camera_is_offline,
+			on_card_recovered=self._card_recovered,
 			problem_card=self._problem_card,
 			rotate_source=self._rotate_frame,
 			slides_source=self._slides_frame)
@@ -371,6 +391,9 @@ class DisplayManager(object):
 		self._grid_fetched = 0.0
 		self._connected_checked = 0.0
 		self._slides = None
+		self._card_retry.forget()
+		if self._retry_timer is not None:
+			self._retry_timer.stop()
 
 	def _resolve_token(self, token):
 		"""Look up a camera's stream when its bouquet entry is first played.
@@ -444,6 +467,51 @@ class DisplayManager(object):
 				# is handled further along, by the problem card.
 				self.log.debug("could not re-read the camera list: %s", exc)
 		return self.store.is_connected(camera_id)
+
+	def _camera_is_offline(self, camera_id):
+		"""Whether this camera is offline, while its card is playing.
+
+		Separate from :meth:`_offline_card` because that one draws: this
+		is asked over and over by the proxy for as long as the card is on
+		screen, and all it needs is the answer.
+		"""
+		return not self._connected_now(camera_id, max_age=CARD_RECHECK_TTL)
+
+	def _card_recovered(self, camera_id):
+		"""A camera came back while its card was playing: open it again.
+
+		Called on a proxy thread, so the zap itself is handed to the main
+		loop. Rate limited, because this changes channel without being
+		asked and a flapping camera must not restart it endlessly.
+		"""
+		if not self._card_retry.allow(camera_id, time.time()):
+			self.log.info(
+				"camera %s came back, but its channel was reopened too "
+				"recently to do it again", camera_id)
+			return
+		self._retry_target = camera_id
+		if self._retry_timer is None:
+			self._retry_timer = eTimer()
+			self._retry_timer.callback.append(self._do_card_retry)
+		self._retry_timer.start(CARD_RETRY_MS, True)
+
+	def _do_card_retry(self):
+		camera_id, self._retry_target = self._retry_target, None
+		if not camera_id:
+			return
+		reference = self._reference_for_camera(camera_id)
+		if not reference:
+			return
+		playing = self._playing_reference()
+		if playing and playing != reference:
+			# The viewer has moved on. Opening a camera channel under
+			# somebody watching something else would be the plugin
+			# changing channel for its own reasons.
+			self.log.debug("camera %s is back, but something else is on",
+				camera_id)
+			return
+		self.log.info("camera %s is back; reopening its channel", camera_id)
+		self._zap_to(reference)
 
 	def _problem_card(self, camera_id):
 		"""A card for a camera the console calls connected but will not serve.

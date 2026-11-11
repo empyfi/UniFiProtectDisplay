@@ -42,6 +42,16 @@ and the project uses [semantic versioning](https://semver.org/).
   when the versions disagree.
 
 ### Fixed
+- A channel showing an OFFLINE card gives the channel back when its
+  camera returns. This was the half of the problem that fresh flags did
+  not solve: the decision was taken once, when the connection opened, so
+  the card played for as long as the viewer stayed there -- and the person
+  this matters to is exactly the one who zapped to an offline camera and
+  waited. The card route now keeps asking while it plays, and because a
+  stream that stops is a channel that stops, the plugin reopens the
+  channel rather than leaving it ended. At most once every twenty seconds
+  per camera, so a camera on a bad connection cannot restart the channel
+  over and over; each restart is a black screen while a stream opens.
 - A camera that comes back is noticed. The flags saying which cameras the
   console can reach were only refreshed by the corner, by the camera list
   screen, or at most every thirty seconds by a channel start -- so a
@@ -68,6 +78,10 @@ and the project uses [semantic versioning](https://semver.org/).
   receiver: the grid delivers 500 to 660 KB in six seconds where it
   delivered 426 KB before, and its first byte arrives after 1.0 seconds
   warm, 1.7 cold.
+
+  The camera file is no longer written when nothing in it changed. The
+  connection check merges a fresh camera list every few seconds while a
+  card is on screen, and each merge was followed by a write to flash.
 
   Measured while doing this, and now in `docs/api.md`: a snapshot takes
   0.18 to 0.39 seconds, and two in a row are byte for byte identical, so

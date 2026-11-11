@@ -561,3 +561,136 @@ class TestBinding:
 		# a plugin needed an IPC mechanism.
 		assert proxy._server.server_address[0] == "127.0.0.1"
 		assert tsproxy.BIND_HOST == "127.0.0.1"
+
+
+class TestTheCardGivesTheChannelBack:
+	"""An OFFLINE card used to play for ever.
+
+	The decision was taken once, when the connection opened, so a camera
+	that came back five minutes ago still had a card on screen -- which is
+	what somebody who zapped there and waited actually sees. Ending the
+	card is not enough on its own, because a stream that stops is a channel
+	that stops, so the plugin is told and reopens the channel.
+	"""
+
+	CARD = b"\xff\xd8card"
+
+	@staticmethod
+	def make(popen, **kwargs):
+		proxy = TsProxy(
+			popen=popen, args_builder=lambda url, ffmpeg: ["x"], **kwargs)
+		proxy.start()
+		return proxy
+
+	@staticmethod
+	def answers(values):
+		"""A check that gives each value in turn, then repeats the last."""
+		remaining = list(values)
+		calls = []
+
+		def check(camera_id):
+			calls.append(camera_id)
+			if len(remaining) > 1:
+				return remaining.pop(0)
+			return remaining[0]
+
+		check.calls = calls
+		return check
+
+	def test_a_camera_still_offline_does_not_reopen_the_channel(self):
+		recovered = []
+		proxy = self.make(
+			FakePopen(payload=b"ts"),
+			offline_card=lambda cid: self.CARD,
+			offline_check=self.answers([True]),
+			on_card_recovered=recovered.append)
+		proxy.register_token("cam-a", "tok")
+		try:
+			TestHttpContract.raw_get(proxy.port, "/cam/tok")
+			assert recovered == []
+		finally:
+			proxy.stop()
+
+	def test_a_camera_that_comes_back_reopens_the_channel(self):
+		recovered = []
+		proxy = self.make(
+			FakePopen(payload=b"ts"),
+			offline_card=lambda cid: self.CARD,
+			# Offline when the channel starts, back a moment later.
+			offline_check=self.answers([True, False]),
+			on_card_recovered=recovered.append)
+		proxy.register_token("cam-a", "tok")
+		try:
+			TestHttpContract.raw_get(proxy.port, "/cam/tok")
+			assert recovered == ["cam-a"]
+		finally:
+			proxy.stop()
+
+	def test_the_cheap_check_decides_rather_than_the_card(self):
+		# Drawing a card to find out whether there is one is work for
+		# nothing, and it happens on every channel start.
+		drawn = []
+		proxy = self.make(
+			FakePopen(payload=b"ts-data"),
+			url_resolver=lambda token: ("cam-a", RTSP_URL),
+			offline_card=lambda cid: drawn.append(cid) or self.CARD,
+			offline_check=lambda cid: False)
+		proxy.register_token("cam-a", "tok")
+		try:
+			TestHttpContract.raw_get(proxy.port, "/cam/tok")
+			assert drawn == []
+		finally:
+			proxy.stop()
+
+	def test_without_a_check_the_card_still_decides(self):
+		# The fallback has to keep working: the check is an optimisation,
+		# not a new requirement.
+		proxy = self.make(
+			FakePopen(payload=b"ts"),
+			offline_card=lambda cid: self.CARD)
+		proxy.register_token("cam-a", "tok")
+		try:
+			assert proxy.is_offline("cam-a") is True
+		finally:
+			proxy.stop()
+
+	def test_a_failing_check_counts_as_offline(self):
+		# Fail towards the card: a camera that cannot be asked about is
+		# more likely down than up, and a card beats eleven seconds of
+		# black followed by a dead channel.
+		def check(camera_id):
+			raise RuntimeError("console went away")
+
+		proxy = self.make(
+			FakePopen(payload=b"ts"), offline_check=check)
+		try:
+			assert proxy.is_offline("cam-a") is True
+		finally:
+			proxy.stop()
+
+	def test_with_no_card_to_draw_the_camera_is_streamed_anyway(self):
+		# No PIL on the image: the behaviour from before cards existed.
+		proxy = self.make(
+			FakePopen(payload=b"ts-data"),
+			url_resolver=lambda token: ("cam-a", RTSP_URL),
+			offline_card=lambda cid: None,
+			offline_check=lambda cid: True)
+		proxy.register_token("cam-a", "tok")
+		try:
+			response = TestHttpContract.raw_get(proxy.port, "/cam/tok")
+			assert b"ts-data" in response
+		finally:
+			proxy.stop()
+
+	def test_recovery_survives_a_handler_that_raises(self):
+		proxy = self.make(
+			FakePopen(payload=b"ts"),
+			offline_card=lambda cid: self.CARD,
+			offline_check=self.answers([True, False]),
+			on_card_recovered=lambda cid: 1 / 0)
+		proxy.register_token("cam-a", "tok")
+		try:
+			response = TestHttpContract.raw_get(proxy.port, "/cam/tok")
+			assert b" 200 " in response.split(b"\r\n", 1)[0]
+		finally:
+			proxy.stop()

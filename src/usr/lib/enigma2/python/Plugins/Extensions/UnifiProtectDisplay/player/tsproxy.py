@@ -143,7 +143,8 @@ class TsProxy(object):
 	def __init__(self, ffmpeg_path="ffmpeg", port=0, log=None,
 			popen=None, args_builder=None, server_factory=None,
 			url_resolver=None, offline_card=None, grid_source=None,
-			problem_card=None, rotate_source=None, slides_source=None):
+			problem_card=None, rotate_source=None, slides_source=None,
+			offline_check=None, on_card_recovered=None):
 		self.ffmpeg_path = ffmpeg_path
 		self.requested_port = port
 		self.port = None
@@ -160,6 +161,13 @@ class TsProxy(object):
 		# ahead with the remux. Keeps the proxy from needing to know what
 		# "offline" means.
 		self._offline_card = offline_card
+		# Whether a camera is offline, without drawing anything. Asked
+		# over and over while a card plays, so it has to be cheap; the
+		# card itself is only drawn at the frame rate.
+		self._offline_check = offline_check
+		# Called with a camera id when its card stopped because the
+		# camera came back. Runs on a server thread.
+		self._on_card_recovered = on_card_recovered
 		# Returns a JPEG for a camera that should be streamable but is
 		# not -- a console that cannot be reached, a tier that will not
 		# enable. Without it those end as a dead channel.
@@ -342,6 +350,31 @@ class TsProxy(object):
 			self._warn("could not render the offline card: %s", exc)
 			return None
 
+	def is_offline(self, camera_id):
+		"""Whether this camera is offline, as cheaply as can be asked.
+
+		Falls back to drawing a card and looking at whether there is
+		one, which is correct but wasteful -- hence the separate check.
+		"""
+		if self._offline_check is not None:
+			try:
+				return bool(self._offline_check(camera_id))
+			except Exception as exc:  # noqa: BLE001
+				self._warn("could not check whether %s is offline: %s",
+					camera_id, exc)
+				return True
+		return self.offline_frame(camera_id) is not None
+
+	def card_recovered(self, camera_id):
+		"""Say that a card ended because its camera came back."""
+		if self._on_card_recovered is None:
+			return
+		try:
+			self._on_card_recovered(camera_id)
+		except Exception as exc:  # noqa: BLE001
+			self._warn("could not ask for camera %s again: %s",
+				camera_id, exc)
+
 	def problem_frame(self, camera_id):
 		"""A card for a camera that cannot be streamed for another reason."""
 		if self._problem_card is None:
@@ -508,12 +541,9 @@ def _handler_for(proxy):
 			# measured at six to eleven seconds on a real receiver, which is
 			# long enough to look like a channel that does not work.
 			camera_id = proxy.camera_for_token(token)
-			if camera_id is not None and proxy.offline_frame(camera_id) is not None:
-				self._info("camera %s is offline; serving a card", camera_id)
-				self._begin()
-				proxy.stream_cards(
-					lambda: proxy.offline_frame(camera_id), self.wfile.write)
-				return
+			if camera_id is not None and proxy.is_offline(camera_id):
+				if self._serve_offline_card(camera_id):
+					return
 			source = proxy.source_for_token(token)
 			if source is None:
 				# Nothing to play and the console did not say why. A card
@@ -527,13 +557,8 @@ def _handler_for(proxy):
 					lambda: proxy.problem_frame(camera_id), self.wfile.write)
 				return
 			# The console may have dropped the camera while we were asking.
-			if proxy.offline_frame(source.camera_id) is not None:
-				self._info("camera %s is offline; serving a card",
-					source.camera_id)
-				self._begin()
-				proxy.stream_cards(
-					lambda: proxy.offline_frame(source.camera_id),
-					self.wfile.write)
+			if (proxy.is_offline(source.camera_id)
+					and self._serve_offline_card(source.camera_id)):
 				return
 			self._begin()
 			if proxy.stream(source, self.wfile.write):
@@ -551,6 +576,40 @@ def _handler_for(proxy):
 			proxy.stream_cards(
 				lambda: proxy.problem_frame(source.camera_id),
 				self.wfile.write)
+
+		def _serve_offline_card(self, camera_id):
+			"""Play the card, and watch for the camera coming back.
+
+			True when the card was served. False means there is no card to
+			draw -- no PIL on this image -- and the caller should go on and
+			try to stream the camera, which is what happened before cards
+			existed at all.
+
+			The decision used to be taken once, when the connection
+			opened, so a channel went on playing OFFLINE however long the
+			camera had been back -- which is exactly what somebody sitting
+			in front of it experiences. Ending the card is not enough on
+			its own, because a stream that stops is a channel that stops,
+			so the plugin is told and it opens the channel again.
+			"""
+			card = proxy.offline_frame(camera_id)
+			if card is None:
+				return False
+			self._info("camera %s is offline; serving a card", camera_id)
+			self._begin()
+			# The card already in hand is the fallback: once the camera is
+			# back the source stops returning one, and a source that
+			# returns nothing would leave ffmpeg with no input at all.
+			proxy.stream_cards(
+				lambda: proxy.offline_frame(camera_id) or card,
+				self.wfile.write,
+				should_continue=lambda: proxy.is_offline(camera_id))
+			if proxy.is_offline(camera_id):
+				# The viewer zapped away, which is the ordinary ending.
+				return True
+			self._info("camera %s is back", camera_id)
+			proxy.card_recovered(camera_id)
+			return True
 
 		def _info(self, message, *args):
 			if proxy._log is not None:

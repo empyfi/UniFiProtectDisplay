@@ -117,7 +117,9 @@ second behind the world. Changing channel is how you leave either one.
 
 A camera the console cannot reach plays a black card naming it and saying
 **OFFLINE**, rather than a channel that simply fails. So does a console that
-cannot be reached at all. That matters most for whoever did not set this up
+cannot be reached at all. If the camera comes back while you are sitting on
+that channel, the channel opens again by itself within a few seconds — you
+do not have to zap away and back. That matters most for whoever did not set this up
 and has no other way to tell an unplugged camera from a broken plugin.
 
 Two settings shape the rotating entries, both in setup: **Change camera

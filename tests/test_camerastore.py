@@ -249,3 +249,72 @@ class TestConnectionState:
 	def test_unknown_camera_is_assumed_reachable(self):
 		store, _ = store_with([])
 		assert store.is_connected("zzz") is True
+
+
+class TestSavingOnlyWhenNeeded:
+	"""The camera file lives in flash.
+
+	While an OFFLINE card is on screen the connection check re-reads the
+	camera list every few seconds and merges the answer, so a save per
+	check would be thousands of writes for a channel somebody left on.
+	"""
+
+	def test_the_first_save_writes(self):
+		store, backing = store_with([{"id": "1", "name": "Hof"}])
+		assert store.save()
+		assert backing.writes == 1
+
+	def test_an_unchanged_save_writes_nothing(self):
+		store, backing = store_with([{"id": "1", "name": "Hof"}])
+		store.save()
+		store.save()
+		store.save()
+		assert backing.writes == 1
+
+	def test_an_unchanged_save_still_reports_success(self):
+		# Callers check the return value; "nothing to do" is not failure.
+		store, _ = store_with([{"id": "1", "name": "Hof"}])
+		store.save()
+		assert store.save() is True
+
+	def test_a_changed_name_is_written(self):
+		store, backing = store_with([{"id": "1", "name": "Hof"}])
+		store.save()
+		store.merge([Camera("1", "Einfahrt", connected=True)])
+		store.save()
+		assert backing.writes == 2
+
+	def test_a_changed_connection_state_is_written(self):
+		store, backing = store_with(
+			[{"id": "1", "name": "Hof", "connected": True}])
+		store.save()
+		store.merge([Camera("1", "Hof", connected=False)])
+		store.save()
+		assert backing.writes == 2
+
+	def test_a_merge_that_changes_nothing_writes_nothing(self):
+		# Exactly the case that matters: the check runs, the console says
+		# the same thing it said five seconds ago.
+		store, backing = store_with(
+			[{"id": "1", "name": "Hof", "connected": True}])
+		store.save()
+		for _ in range(10):
+			store.merge([Camera("1", "Hof", connected=True)])
+			store.save()
+		assert backing.writes == 1
+
+	def test_force_writes_anyway(self):
+		store, backing = store_with([{"id": "1", "name": "Hof"}])
+		store.save()
+		assert store.save(force=True)
+		assert backing.writes == 2
+
+	def test_a_failed_write_is_tried_again_next_time(self):
+		# A write that failed must not be remembered as done, or a full
+		# filesystem would mean the change is never written at all.
+		store, backing = store_with([{"id": "1", "name": "Hof"}])
+		backing.fail = IOError("no space")
+		assert store.save() is False
+		backing.fail = None
+		assert store.save() is True
+		assert backing.writes == 1
