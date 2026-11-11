@@ -39,8 +39,11 @@ connection" button. Returns the Protect version:
 Every camera the key can see. The plugin reads `id` and `name`, and treats
 `isConnected` or `state` as the online flag when present. This is also the
 call the channel list makes to decide whether to serve a camera or an
-OFFLINE card, at most once every thirty seconds, because one request answers
-for every camera at once. Protect adds fields
+OFFLINE card, because one request answers for every camera at once. A
+channel start re-reads it almost always -- 40 ms against a channel start of
+a second or more is worth paying to avoid showing an OFFLINE card for a
+camera that has come back -- while the grid, which asks several times a
+second, is answered from a reading at most half a minute old. Protect adds fields
 between releases, so parsing is lenient: unknown keys are ignored, and an
 entry without an `id` is dropped rather than failing the whole list.
 
@@ -82,6 +85,13 @@ for the current state without it (`enable=False` in `Controller.stream_url`).
 Raw JPEG bytes. `highQuality=true` asks for 1080p or better. The snapshot
 overlay leaves it off: the picture is scaled into a corner anyway, and a
 larger image costs both console time and decode time on the receiver.
+
+Measured against the console this was built on, at default quality: 0.18 to
+0.39 seconds per request, usually about 0.22, for 115 to 130 KB. Two
+requests in a row come back byte for byte identical, so Protect makes a new
+picture roughly every half second -- which is the floor on how fresh any of
+the stills can be, and the reason nothing here asks faster than once a
+second per camera.
 
 This endpoint returns HTTP 503 when the console cannot reach the camera --
 observed against a console with two cameras in `DISCONNECTED` state, both

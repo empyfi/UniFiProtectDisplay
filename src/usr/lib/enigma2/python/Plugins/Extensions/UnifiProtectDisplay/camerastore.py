@@ -177,7 +177,15 @@ class CameraStore(object):
 				added += 1
 			else:
 				entry["name"] = camera.name or entry["name"]
+				was = bool(entry.get("connected"))
 				entry["connected"] = bool(camera.connected)
+				if entry["connected"] != was and self._log is not None:
+					# Worth a line of its own: "the plugin did not notice my
+					# camera came back" is answered by whether this was
+					# logged, and when.
+					self._log.info("camera %s (%s) is now %s",
+						camera.id, entry["name"],
+						"reachable" if entry["connected"] else "offline")
 				merged.append(entry)
 		removed = len([e for e in self._entries if e["id"] not in incoming_ids])
 		self._entries = merged

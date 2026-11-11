@@ -42,6 +42,37 @@ and the project uses [semantic versioning](https://semver.org/).
   when the versions disagree.
 
 ### Fixed
+- A camera that comes back is noticed. The flags saying which cameras the
+  console can reach were only refreshed by the corner, by the camera list
+  screen, or at most every thirty seconds by a channel start -- so a
+  camera plugged back in went on playing an OFFLINE card, and worse, the
+  rotation channel went on stepping over it. With two cameras that left
+  rotation sitting on the other one for as long as the channel stayed on,
+  which looks like rotation being broken rather than like a stale flag.
+  A channel start now re-reads the list almost always, the grid re-reads
+  it as it draws, and the rotation channel keeps it current in the
+  background while it runs. The camera store logs a camera changing
+  state, so the next time this is asked the log answers it.
+- The stills refresh about twice as fast. Everything drawn rather than
+  filmed -- the cards, the grid, both rotating entries -- now runs at four
+  frames a second instead of two, which halves the priming cushion the
+  stream runs behind by, from two seconds to one. The grid also renews its
+  snapshots on the refresh interval rather than a hardcoded two seconds,
+  and that interval now defaults to one second.
+
+  Honouring the frame rate turned out to be the other half of it. The
+  grid's own snapshot requests happen inside the frame loop -- 0.22
+  seconds each, measured -- and a whole interval was waited on top, so
+  ffmpeg was fed slower than the frame rate it had been told. The wait is
+  now whatever is left of the interval. Measured over the loopback on the
+  receiver: the grid delivers 500 to 660 KB in six seconds where it
+  delivered 426 KB before, and its first byte arrives after 1.0 seconds
+  warm, 1.7 cold.
+
+  Measured while doing this, and now in `docs/api.md`: a snapshot takes
+  0.18 to 0.39 seconds, and two in a row are byte for byte identical, so
+  Protect makes a new picture about every half second. That is the floor;
+  asking faster would cost requests and show the same picture.
 - Motion no longer restarts a camera that is already on screen. Protect's
   Alarm Manager sends one alarm per movement rather than one per event, so
   somebody standing in front of a camera produces a run of them -- and

@@ -38,7 +38,7 @@ So the plugin offers two corner modes:
 **Snapshots** (default). JPEGs from the Protect API, decoded with `ePicLoad`
 and drawn into an `ePixmap` over whatever is playing. No decoder involved, so
 it works on every receiver alongside live TV, with nothing extra installed.
-Roughly one picture every one to two seconds — stills, not video.
+Roughly one picture a second — stills, not video.
 
 **Live video** (optional). `ffmpeg -c copy` remuxes RTSP into MPEG‑TS and
 serves it on loopback; the PiP decoder plays that as a type‑1 service:

@@ -83,7 +83,7 @@ SETTINGS = {
 	"corner": (PLAIN, "topright"),
 	"corner_width": (PLAIN, "25"),
 	"corner_margin": (PLAIN, "2"),
-	"snapshot_interval": (PLAIN, "2"),
+	"snapshot_interval": (PLAIN, "1"),
 	"snapshot_high_quality": (BOOLEAN, False),
 	"rotate": (BOOLEAN, False),
 	"rotate_interval": (PLAIN, "15"),

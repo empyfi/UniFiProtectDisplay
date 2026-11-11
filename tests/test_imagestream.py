@@ -9,6 +9,7 @@ all -- so the startup path is pinned down rather than left to chance.
 """
 
 import threading
+import time
 
 from UnifiProtectDisplay.player import imagestream
 from UnifiProtectDisplay.player.imagestream import ImageStreamer
@@ -145,6 +146,41 @@ class TestPriming:
 		# ending: a console that blinks must not blank the television.
 		assert len(stdin.writes) >= imagestream.PRIME_FRAMES + 1
 		assert all(write == JPEG for write in stdin.writes)
+
+	def test_a_slow_source_does_not_slow_the_frame_rate(self):
+		"""The grid's own fetch used to be added to the interval.
+
+		One snapshot per camera measured about 0.22 s on the console this
+		was built against, and the loop then waited a whole interval on
+		top, so ffmpeg was fed slower than the frame rate it had been
+		told. Here the source takes most of an interval: four frames must
+		still take about four intervals, not eight.
+		"""
+		interval = 0.1
+		slow = interval * 0.8
+		calls = []
+
+		def source(stop):
+			calls.append(1)
+			time.sleep(slow)
+			if len(calls) >= 4:
+				stop.set()
+			return JPEG
+
+		began = time.time()
+		self.feed(source, framerate=int(1 / interval))
+		elapsed = time.time() - began
+		# Uncompensated this would be about 4 * (interval + slow) = 0.72 s.
+		assert elapsed < 4 * (interval + slow) * 0.8
+
+	def test_the_remaining_interval_is_never_negative(self):
+		# A source slower than the whole interval must not hand
+		# Event.wait() a negative timeout.
+		assert ImageStreamer._remaining(0.1, time.time() - 5.0) == 0.0
+
+	def test_the_remaining_interval_is_what_is_left(self):
+		left = ImageStreamer._remaining(1.0, time.time() - 0.25)
+		assert 0.6 < left < 0.8
 
 	def test_the_pipe_is_closed_when_the_feed_ends(self):
 		def source(stop):

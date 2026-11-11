@@ -18,6 +18,7 @@ re-encode four camera streams.
 
 import subprocess
 import threading
+import time
 
 # Two frames a second. Enough that a zap shows a picture quickly, slow
 # enough that fetching a snapshot per camera per frame stays reasonable.
@@ -123,6 +124,15 @@ class ImageStreamer(object):
 			feeder.join(timeout=3)
 		return written
 
+	@staticmethod
+	def _remaining(interval, started):
+		"""What is left of this frame's interval, never below zero.
+
+		No catching up on time already lost: a console that answered slowly
+		should not be followed by a burst of frames.
+		"""
+		return max(0.0, interval - (time.time() - started))
+
 	def _feed(self, process, stop):
 		"""Write one JPEG per frame interval until told to stop."""
 		interval = 1.0 / float(max(1, self._framerate))
@@ -130,6 +140,13 @@ class ImageStreamer(object):
 		primed = False
 		try:
 			while not stop.is_set():
+				# Everything this iteration does counts against the interval,
+				# not just the waiting. Asking the console for a snapshot takes
+				# a fifth of a second and the grid asks once per camera, so
+				# adding a whole interval on top of that fed ffmpeg slower than
+				# the frame rate it was told -- and the higher the frame rate,
+				# the bigger the share one fetch takes.
+				started = time.time()
 				try:
 					frame = self._frame_source()
 				except Exception as exc:  # noqa: BLE001
@@ -140,7 +157,7 @@ class ImageStreamer(object):
 				if last is None:
 					# Nothing to send yet; wait rather than closing the
 					# pipe, which ffmpeg would treat as end of input.
-					stop.wait(interval)
+					stop.wait(self._remaining(interval, started))
 					continue
 				# The first picture goes in several times, back to back, so
 				# ffmpeg can identify the input immediately. The copies are
@@ -154,7 +171,7 @@ class ImageStreamer(object):
 					process.stdin.flush()
 				except (IOError, OSError, ValueError):
 					break
-				stop.wait(interval)
+				stop.wait(self._remaining(interval, started))
 		finally:
 			try:
 				process.stdin.close()

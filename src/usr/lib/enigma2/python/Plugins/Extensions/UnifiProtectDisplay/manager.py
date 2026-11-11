@@ -29,6 +29,14 @@ from .settings import MODE_OFF, MODE_PIP, MODE_SNAPSHOT
 from .localisation import _
 
 
+# How fresh the stored offline flags have to be before a channel in the
+# bouquet is played. Nearly always "re-read them": the request costs about
+# 40 ms and covers every camera, against a channel start of a second or
+# more, and answering a zap from a flag half a minute old is how a camera
+# that has come back still plays an OFFLINE card. The floor is only there
+# to keep several routes opening together from asking several times.
+CHANNEL_START_TTL = 2.0
+
 # How often the camera list may be re-fetched while switching around.
 # Without a floor, holding the next-camera button would fire one request per
 # press; with it, a camera that has just come back is picked up within a few
@@ -52,10 +60,6 @@ ZAP_TICK_MS = 1000
 # A one-shot timer puts the zap back on the main loop, where an
 # ordinary channel change happens.
 ZAP_DELAY_MS = 50
-
-# How often the grid refetches snapshots. One request per camera per frame
-# would hammer the console for a picture nobody is studying that closely.
-GRID_INTERVAL = 2.0
 
 
 class DisplayManager(object):
@@ -94,6 +98,7 @@ class DisplayManager(object):
 		self._grid_fetched = 0.0
 		self._connected_checked = 0.0
 		self._slides = None
+		self._stills_interval = float(config.snapshot_interval.value)
 		self._zap_rotation = None
 		self._zap_hooked = False
 		self._zap_timer = None
@@ -353,6 +358,9 @@ class DisplayManager(object):
 			if token:
 				proxy.register_token(camera_id, token)
 		self.store.save()
+		# The grid draws on a proxy thread, so its interval is read here on
+		# the main loop -- the same way the slides entry captures it.
+		self._stills_interval = float(config.snapshot_interval.value)
 		self._bouquet_proxy = proxy
 
 	def stop_bouquet_proxy(self):
@@ -402,11 +410,15 @@ class DisplayManager(object):
 		from . import cards
 		if not cards.available():
 			return None
-		if self._connected_now(camera_id):
+		# A channel start is exactly the moment to spend 40 ms on the truth:
+		# this is the decision between a live camera and an OFFLINE card, and
+		# taking it from a stale flag is what makes a camera that has come
+		# back still look dead from the sofa.
+		if self._connected_now(camera_id, max_age=CHANNEL_START_TTL):
 			return None
 		return cards.offline_card(self.store.name_for(camera_id))
 
-	def _connected_now(self, camera_id):
+	def _connected_now(self, camera_id, max_age=CONNECTED_TTL):
 		"""Whether the console reaches this camera, from a recent answer.
 
 		The stored flag is written when the camera list is fetched, and on
@@ -421,7 +433,7 @@ class DisplayManager(object):
 		picture being decided on anyway.
 		"""
 		now = time.time()
-		if (now - self._connected_checked > CONNECTED_TTL
+		if (now - self._connected_checked > max_age
 				and self.api.is_configured()):
 			self._connected_checked = now
 			try:
@@ -518,23 +530,31 @@ class DisplayManager(object):
 	def _grid_frame(self):
 		"""One picture of every selected camera.
 
-		Snapshots are fetched here, on a proxy thread, and cached for a
-		couple of seconds: the grid updates about as fast as the cameras
-		can be asked, and a slow console stalls nothing because the
-		previous frame is simply shown again.
+		Snapshots are fetched here, on a proxy thread, and cached for the
+		refresh interval: the grid updates about as fast as the cameras can
+		be asked, and a slow console stalls nothing because the previous
+		frame is simply shown again.
+
+		Measured against the console this was built on: a snapshot takes
+		about 0.22 s and two in a row come back byte for byte identical, so
+		Protect makes a new picture roughly every half second. Asking much
+		faster than that would cost requests and show the same picture.
 		"""
 		from . import cards
 		if not cards.available():
 			return None
 		now = time.time()
-		if now - self._grid_fetched < GRID_INTERVAL and self._grid_cache:
+		if now - self._grid_fetched < self._stills_interval and self._grid_cache:
 			return self._grid_cache
 		self._grid_fetched = now
 		tiles = []
 		for camera_id in self.store.enabled_ids():
 			name = self.store.name_for(camera_id)
 			image = None
-			if self.store.is_connected(camera_id):
+			# Re-read rather than trusting the stored flag: the grid is often
+			# what is on screen while a camera comes back, and it used to go
+			# on drawing an OFFLINE tile until something else refreshed.
+			if self._connected_now(camera_id):
 				try:
 					image = self.api.get_snapshot(camera_id)
 				except Exception as exc:  # noqa: BLE001
@@ -709,6 +729,12 @@ class DisplayManager(object):
 		if zapper is None or not zapper.running:
 			self._disarm_zap_timer()
 			return
+		# Rotation steps over cameras the store calls offline, so while it is
+		# running the store has to be kept current -- otherwise a camera that
+		# comes back is skipped for as long as the channel stays on, and with
+		# two cameras that leaves rotation sitting on the other one for ever.
+		# Throttled to REFRESH_INTERVAL inside, and it never blocks.
+		self.note_camera_shown()
 		target = zapper.tick(time.time())
 		if target:
 			self._zap_to(target)

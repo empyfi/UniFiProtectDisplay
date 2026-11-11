@@ -101,7 +101,7 @@ def init_config():
 	settings.corner_width = ConfigSelectionNumber(
 		MIN_WIDTH_PERCENT, MAX_WIDTH_PERCENT, 5, default=25)
 	settings.corner_margin = ConfigSelectionNumber(0, 10, 1, default=2)
-	settings.snapshot_interval = ConfigSelectionNumber(1, 30, 1, default=2)
+	settings.snapshot_interval = ConfigSelectionNumber(1, 30, 1, default=1)
 	settings.snapshot_high_quality = ConfigYesNo(default=False)
 
 	# -- rotation ---------------------------------------------------------

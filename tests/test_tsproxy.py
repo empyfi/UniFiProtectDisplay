@@ -518,28 +518,39 @@ class TestCardRoutes:
 		finally:
 			proxy.stop()
 
-	def test_slides_run_faster_than_the_cards(self):
-		# The priming cushion is frames divided by frame rate, so the
-		# frame rate is what decides how far behind the world a camera
-		# you are actually watching ends up.
+	@pytest.mark.parametrize("path,kwargs", [
+		("/slides", {"slides_source": lambda: b"\xff\xd8slide"}),
+		("/grid", {"grid_source": lambda: b"\xff\xd8grid"}),
+		("/rotate", {"rotate_source": lambda: b"\xff\xd8rotate"}),
+	])
+	def test_every_drawn_route_runs_at_the_card_rate(self, path, kwargs):
+		# The priming cushion is frames divided by frame rate, so the frame
+		# rate is what decides how far behind the world a drawn picture
+		# ends up -- two seconds at 2 fps, one at 4. Nothing drawn has any
+		# reason to be the slower of the two.
 		popen = FakePopen(payload=b"ts")
-		proxy = self.make(popen, slides_source=lambda: b"\xff\xd8slide")
+		proxy = self.make(popen, **kwargs)
 		try:
-			TestHttpContract.raw_get(proxy.port, "/slides")
+			TestHttpContract.raw_get(proxy.port, path)
 			args = popen.calls[-1]["args"]
 			rate = int(args[args.index("-framerate") + 1])
-			assert rate == tsproxy.SLIDES_FRAMERATE
+			assert rate == tsproxy.CARD_FRAMERATE
 			assert rate > 2
 		finally:
 			proxy.stop()
 
-	def test_the_grid_keeps_the_card_frame_rate(self):
+	def test_an_offline_card_runs_at_the_card_rate_too(self):
+		# The one a viewer waits on most: it is what a channel shows while
+		# they wonder whether the plugin is broken.
 		popen = FakePopen(payload=b"ts")
-		proxy = self.make(popen, grid_source=lambda: b"\xff\xd8grid")
+		proxy = self.make(
+			popen, offline_card=lambda cid: b"\xff\xd8off")
+		proxy.register_token("cam-a", "tok")
 		try:
-			TestHttpContract.raw_get(proxy.port, "/grid")
+			TestHttpContract.raw_get(proxy.port, "/cam/tok")
 			args = popen.calls[-1]["args"]
-			assert int(args[args.index("-framerate") + 1]) == 2
+			assert int(args[args.index("-framerate") + 1]) == (
+				tsproxy.CARD_FRAMERATE)
 		finally:
 			proxy.stop()
 

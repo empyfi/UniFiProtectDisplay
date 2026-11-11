@@ -61,7 +61,17 @@ SLIDES_PATH = "/slides"
 # at two frames a second it is two seconds, at four it is one. For a
 # card nobody can tell; for a camera you are watching to see whether
 # anybody is at the door, a second is worth the extra frames.
-SLIDES_FRAMERATE = 4
+# Frame rate for every route that is drawn rather than filmed: the
+# offline and problem cards, the grid, and both rotating entries.
+#
+# It is not about smoothness -- these pictures barely move -- but about
+# lag. ffmpeg is primed with PRIME_FRAMES copies of the first picture so
+# that a zap shows something quickly, and that priming is exactly what
+# puts the stream behind the world: PRIME_FRAMES divided by this. Four
+# frames at 2 fps was two seconds behind; at 4 fps it is one. The cost is
+# a second encode of a nearly static frame, which is a few percent of one
+# core.
+CARD_FRAMERATE = 4
 
 # eHttpStream treats a handful of content types as playlists and then tries to
 # read a URL out of the body (lib/base/httpstream.cpp). video/mp2t is not one
@@ -307,7 +317,7 @@ class TsProxy(object):
 		return "http://%s:%d%s" % (BIND_HOST, self.port, SLIDES_PATH)
 
 	def stream_cards(self, frame_source, write, should_continue=None,
-			framerate=None):
+			framerate=CARD_FRAMERATE):
 		"""Serve a series of pictures as a transport stream.
 
 		Used for the offline card and the grid, so a bouquet entry plays
@@ -485,10 +495,7 @@ def _handler_for(proxy):
 					self.send_error(404, "Not available")
 					return
 				self._begin()
-				proxy.stream_cards(
-					source, self.wfile.write,
-					framerate=(SLIDES_FRAMERATE if path == SLIDES_PATH
-						else None))
+				proxy.stream_cards(source, self.wfile.write)
 				return
 			if not path.startswith(PATH_PREFIX):
 				self.send_error(404, "Not found")

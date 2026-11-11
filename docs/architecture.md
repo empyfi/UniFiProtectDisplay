@@ -188,7 +188,16 @@ reading frames; at two frames a second that inspection was five seconds of
 black screen on a receiver, against one second with the priming and a short
 input probe. The cost is that the stream then runs behind the world by
 frames divided by frame rate -- two seconds at 2 fps, one at 4 -- which is
-why the rotating stills channel runs at 4.
+why everything drawn runs at 4.
+
+The other half of the frame rate is honouring it. Producing a frame is not
+free: the grid asks the console for a snapshot per camera, 0.22 seconds
+each as measured, and that used to happen inside the frame loop with a full
+interval waited on top. ffmpeg was therefore fed slower than the frame rate
+it had been told, which is a stream that drifts behind whatever it claims
+to be. The wait is now whatever is left of the interval, and nothing is
+caught up afterwards: a console that answered slowly should not be followed
+by a burst of frames.
 
 ### `zaprotation.py` and `slideshow.py`
 Two ways to play the cameras in turn, and they are opposites.
@@ -243,6 +252,19 @@ newer camera is the more interesting one. The dwell deliberately does not
 restart on a camera's own repeat reports -- otherwise somebody moving about
 in front of one camera could hold the screen against a second camera
 indefinitely, which is the moment the second camera matters most.
+
+Freshness is the other half of this, and it bit twice. The flags saying
+which cameras the console can reach are written when the camera list is
+fetched, and everything that decides anything reads them: the channel list
+chooses between a live stream and an OFFLINE card, and rotation steps over
+cameras it believes are down. A flag half a minute old therefore shows a
+camera that has come back as dead, and -- worse, because it is silent --
+makes rotation skip it, which with two cameras leaves rotation sitting on
+the other one indefinitely. So a channel start re-reads the list almost
+always, the grid re-reads it as it draws, and the rotation channel keeps the
+list current in the background for as long as it is running. The store logs
+a camera changing state, because that is the line every "it did not notice"
+question is answered by.
 
 The hold is the older and separate idea: it keeps automatic rotation from
 sliding off a camera motion has just brought up. Its length is the user's

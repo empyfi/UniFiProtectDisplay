@@ -24,6 +24,21 @@ class FakeFile:
 		self.content = text
 		self.writes += 1
 
+class SpyLog:
+	"""Collects the store's own log lines, already formatted."""
+
+	def __init__(self):
+		self.infos = []
+
+	def info(self, message, *args):
+		self.infos.append(message % args if args else message)
+
+	def error(self, message, *args):
+		pass
+
+	def debug(self, message, *args):
+		pass
+
 def store_with(entries=None, **kwargs):
 	payload = json.dumps(entries) if entries is not None else ""
 	backing = FakeFile(payload)
@@ -176,6 +191,44 @@ class TestConnectionState:
 		assert store.is_connected("1") is False
 
 	def test_refresh_updates_a_camera_that_came_back(self):
+		store, _ = store_with([{"id": "1", "connected": False}])
+		store.merge([Camera("1", "Hof", connected=True)])
+		assert store.is_connected("1") is True
+
+	def test_a_camera_coming_back_is_logged(self):
+		# The whole class of "the plugin did not notice my camera came
+		# back" is diagnosed from this line and its timestamp, so it is
+		# worth a test of its own.
+		log = SpyLog()
+		store, _ = store_with([{"id": "1", "name": "Hof",
+			"connected": False}], log=log)
+		store.merge([Camera("1", "Hof", connected=True)])
+		assert any("is now reachable" in line for line in log.infos)
+		assert any("Hof" in line for line in log.infos)
+
+	def test_a_camera_going_away_is_logged(self):
+		log = SpyLog()
+		store, _ = store_with([{"id": "1", "name": "Hof",
+			"connected": True}], log=log)
+		store.merge([Camera("1", "Hof", connected=False)])
+		assert any("is now offline" in line for line in log.infos)
+
+	def test_an_unchanged_camera_is_not_logged(self):
+		# A refresh happens every few seconds while a camera is on screen.
+		# A line each time would bury the one that matters.
+		log = SpyLog()
+		store, _ = store_with([{"id": "1", "name": "Hof",
+			"connected": True}], log=log)
+		store.merge([Camera("1", "Hof", connected=True)])
+		assert log.infos == []
+
+	def test_a_new_camera_is_not_reported_as_a_change(self):
+		log = SpyLog()
+		store, _ = store_with([], log=log)
+		store.merge([Camera("1", "Hof", connected=True)])
+		assert log.infos == []
+
+	def test_merging_without_a_log_still_works(self):
 		store, _ = store_with([{"id": "1", "connected": False}])
 		store.merge([Camera("1", "Hof", connected=True)])
 		assert store.is_connected("1") is True
