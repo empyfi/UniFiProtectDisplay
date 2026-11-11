@@ -262,6 +262,14 @@ class SnapshotOverlay(Screen):
 	def next_camera(self):
 		"""Manual skip, from the extensions menu."""
 		self._rotation.next()
+		self.show_current()
+
+	def show_current(self):
+		"""Draw whichever camera is selected now, without stepping.
+
+		What motion wants: the camera that moved has already been selected,
+		and stepping past it would show its neighbour.
+		"""
 		self._elapsed = 0
 		self._update_label()
 		self._request()

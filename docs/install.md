@@ -140,6 +140,13 @@ In Protect: **Alarm Manager → New Alarm**, one per camera — trigger
 GET, and paste the matching URL. The camera is then brought up when it sees
 movement, and held there briefly so rotation does not slide away.
 
+Alarms arrive one per movement, not one per event, so a camera somebody is
+standing in front of reports over and over; those repeats only extend how
+long it is kept and never restart the picture. A camera that has just come
+up also keeps the screen for a few seconds against another camera's motion,
+because two cameras watching the same path report almost together and
+swapping between them faster than a stream opens shows neither.
+
 ## 7. Day-to-day use
 
 From the extensions menu (usually the blue button on the remote):

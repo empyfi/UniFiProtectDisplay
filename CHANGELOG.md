@@ -42,6 +42,25 @@ and the project uses [semantic versioning](https://semver.org/).
   when the versions disagree.
 
 ### Fixed
+- Motion no longer restarts a camera that is already on screen. Protect's
+  Alarm Manager sends one alarm per movement rather than one per event, so
+  somebody standing in front of a camera produces a run of them -- and
+  each one asked Protect for a stream again and restarted the decoder, so
+  the picture flickered for as long as they stood there. A repeat report
+  now only extends how long the camera is kept.
+- A camera brought up by motion keeps the screen for a few seconds before
+  another camera's motion can take it. Two cameras watching the same path
+  report within a second or two of each other, and the screen swapped back
+  and forth faster than a stream could open: what you saw was not both
+  cameras but neither. After those seconds newer motion wins at once.
+- In snapshot corner mode, motion showed the camera *after* the one that
+  moved. The code selected the right camera and then called the manual
+  *next camera* action, which stepped one past it; with two cameras that
+  meant motion always showed the wrong one. PiP mode was unaffected.
+
+  The decision about what a report should do now lives in
+  `motionpolicy.py`, below the architecture line and with the clock passed
+  in, so these sequences are 25 tests rather than guesses.
 - Two settings the channel list depends on were reachable only through the
   corner. *Change camera every* decides how long each camera gets on both
   rotating channels but appeared only when the corner's own rotation was

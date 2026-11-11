@@ -57,6 +57,7 @@ is available.
   protect/api    camerastore     rotation       capabilities    bouquet.py
   protect/models  geometry        async_util     servicerefs     cards.py
   settings.py     logger.py       zaprotation    slideshow       buttonbinding
+  motionpolicy
 ```
 
 `player/tsproxy.py` straddles the line: it imports no enigma2 and is tested
@@ -217,6 +218,35 @@ nothing, and the private API the web interface uses rejects an API key. All
 three were measured against a live console. Protect's Alarm Manager can call
 out, though, so the direction is reversed and the receiver listens instead of
 polling -- which also means nothing has to be kept alive.
+
+The listener's own job ends at "camera X reported motion". What that should
+do to the picture is `motionpolicy.py`.
+
+### `motionpolicy.py`
+Protect reports motion as a stream of separate alarms rather than as a
+state, so what to put on screen is a question about a *sequence* of reports
+-- which is why it is a module of its own with the clock passed in, rather
+than a few lines in the manager. Two rules, each from a failure.
+
+A camera already on screen is never put there again. Showing a camera costs
+a request to Protect and a decoder restart, and one person moving in front
+of one camera produces alarm after alarm, so acting on each of them tore the
+picture down and rebuilt it for as long as somebody stood there. A repeat
+report now extends how long the camera is kept and changes nothing else.
+
+A camera that has just arrived keeps the screen briefly even when another
+camera reports motion. Two cameras watching the same path report within a
+second or two of each other, and without a floor the screen swapped back and
+forth faster than a stream can open: the result was not "both cameras" but
+neither. Once the dwell has passed, newer motion wins at once, because the
+newer camera is the more interesting one. The dwell deliberately does not
+restart on a camera's own repeat reports -- otherwise somebody moving about
+in front of one camera could hold the screen against a second camera
+indefinitely, which is the moment the second camera matters most.
+
+The hold is the older and separate idea: it keeps automatic rotation from
+sliding off a camera motion has just brought up. Its length is the user's
+*seconds a camera stays on screen after motion*; the dwell is clamped to it.
 
 ### `player/pip_remux.py`
 Borrows `session.pip` and `session.pipshown` using exactly the sequence

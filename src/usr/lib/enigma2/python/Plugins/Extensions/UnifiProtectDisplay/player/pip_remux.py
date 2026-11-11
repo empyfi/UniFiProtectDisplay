@@ -290,6 +290,11 @@ class PipCorner(object):
 			self._info("PiP was closed elsewhere; cleaning up")
 			self.stop(pip_already_gone=True)
 
+	def show_current(self):
+		"""Play whichever camera is selected now, without stepping."""
+		if self._active:
+			self._play_current()
+
 	def next_camera(self):
 		self._rotation.next()
 		if self._rotate_timer is not None:

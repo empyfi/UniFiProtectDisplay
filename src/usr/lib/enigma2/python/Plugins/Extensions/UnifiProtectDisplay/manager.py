@@ -22,6 +22,7 @@ from .camerastore import CameraStore
 from .capabilities import Capabilities
 from .controller import Controller
 from .logger import Logger
+from .motionpolicy import EXTEND, IGNORE, MotionPolicy
 from .protect.api import ProtectApi
 from .rotation import Rotation
 from .settings import MODE_OFF, MODE_PIP, MODE_SNAPSHOT
@@ -86,7 +87,8 @@ class DisplayManager(object):
 		self._last_refresh = 0.0
 		self._refresh_task = None
 		self._webhook = None
-		self._motion_until = 0.0
+		self._motion = MotionPolicy(hold=config.motion_hold.value)
+		self._motion_timer = None
 		self._bouquet_proxy = None
 		self._grid_cache = None
 		self._grid_fetched = 0.0
@@ -173,6 +175,7 @@ class DisplayManager(object):
 		self.controller.invalidate_stream()
 		self.rotation.enabled = config.rotate.value
 		self.rotation.set_cameras(self.store.enabled_ids())
+		self._motion.set_hold(config.motion_hold.value)
 		self.apply_key_binding()
 		self.stop_webhook()
 		self.start_webhook()
@@ -277,6 +280,12 @@ class DisplayManager(object):
 		if self._pip is not None:
 			self._pip.stop()
 			self._pip = None
+		# Nothing is on screen to hold any more, and a camera remembered
+		# from this corner would otherwise suppress the next one's first
+		# motion.
+		self._disarm_motion_release()
+		self._motion.forget()
+		self.rotation.resume()
 
 	def toggle_corner(self):
 		if self.corner_running():
@@ -912,28 +921,70 @@ class DisplayManager(object):
 			if not ok:
 				self.log.error("could not show the corner on motion: %s", message)
 				return
-		if not self.rotation.select(camera_id):
+		# What to do about a report is a question about the whole run of
+		# them, so it is decided in motionpolicy and merely carried out
+		# here. The camera on screen has to be passed in: it is the only
+		# way to tell "switch to this" from "this is already the picture".
+		decision = self._motion.report(
+			camera_id, time.time(), on_screen=self._camera_on_screen())
+		if decision == IGNORE:
+			self.log.info(
+				"motion on %s ignored; %s has only just come up",
+				camera_id, self._motion.camera)
 			return
-		# Hold this camera briefly so rotation does not slide off it.
-		self._motion_until = time.time() + int(config.motion_hold.value)
+		# Either way the camera keeps the screen, so rotation waits.
 		self.rotation.pause()
-		if self._pip is not None and self._pip.active:
-			self._pip._play_current()
-		elif self._overlay is not None:
-			self._overlay.next_camera()
-		self.log.info("showing camera %s after motion", camera_id)
 		self._arm_motion_release()
+		if decision == EXTEND:
+			# Already the picture. Showing it again would cost a request to
+			# Protect and a decoder restart, which is how a camera somebody
+			# was standing in front of used to flicker.
+			self.log.debug(
+				"motion on %s, which is already on screen", camera_id)
+			return
+		if not self.rotation.select(camera_id):
+			self.log.info("motion on %s, which rotation does not hold",
+				camera_id)
+			return
+		self._show_selected_camera()
+		self.log.info("showing camera %s after motion", camera_id)
+
+	def _camera_on_screen(self):
+		"""The camera the corner is showing, or ``None``.
+
+		Both corner modes play whatever the rotation cursor points at, so
+		that is the answer -- including while its stream is still opening,
+		which is exactly when it must not be restarted.
+		"""
+		if not self.corner_running():
+			return None
+		return self.rotation.current()
+
+	def _show_selected_camera(self):
+		"""Put the selected camera on screen, in whichever mode is running.
+
+		Not ``next_camera()``: that is the manual skip and steps one past the
+		camera that moved, which in snapshot mode showed the wrong one.
+		"""
+		if self._pip is not None and self._pip.active:
+			self._pip.show_current()
+		elif self._overlay is not None:
+			self._overlay.show_current()
 
 	def _arm_motion_release(self):
-		if getattr(self, "_motion_timer", None) is None:
+		if self._motion_timer is None:
 			self._motion_timer = eTimer()
 			self._motion_timer.callback.append(self._release_motion_hold)
 		self._motion_timer.start(2000, False)
 
+	def _disarm_motion_release(self):
+		if self._motion_timer is not None:
+			self._motion_timer.stop()
+
 	def _release_motion_hold(self):
-		if time.time() < self._motion_until:
+		if not self._motion.release(time.time()):
 			return
-		self._motion_timer.stop()
+		self._disarm_motion_release()
 		self.rotation.resume()
 
 	# -- the PiP key ------------------------------------------------------
